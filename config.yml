@@ -1,0 +1,8 @@
+feeds:
+  - http://freethoughtblogs.com/pharyngula/feed/
+  - http://xkcd.com/rss.xml
+  - http://boingboing.net/feed
+
+retries: 10
+timeout: 10
+browser: lynx
