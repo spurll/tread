@@ -9,15 +9,19 @@ Installation
 Instructions
 ------------
 
-Add the desired feeds to `config.yml` and run `python3 tread.py`.
+Add the desired feeds to `config.yml` and ensure that the requirements are satisfied (`j2pa` is required if `ascii_images` is set to `true` in `config.yml`, and either `lynx` or `w3m` is required to do basic parsing of HTML content).
+
+Run `python3 tread.py`.
 
 Requirements
 ------------
 
 * pyyaml
+* python-dateutil
 * requests
 * beautifulsoup4
-* lynx or w3m
+* j2pa (optional)
+* lynx (or w3m)
 
 Bugs and Feature Requests
 =========================

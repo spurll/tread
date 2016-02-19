@@ -4,7 +4,7 @@
 # Attribution-ShareAlike 4.0 International License.                    
 
 
-import subprocess, requests, yaml, curses, dateutil
+import subprocess, requests, yaml, curses, dateutil, textwrap
 from shutil import get_terminal_size
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
@@ -41,22 +41,27 @@ def main(screen):
     sidebar_width = full_sidebar_width - 4
     content_width = full_content_width - 4
     height = full_height - 2
+    max_lines = config.get('buffer_lines', 1000)
 
     # Initialize screen and windows.
     sidebar_window = curses.newwin(full_height, full_sidebar_width, 0, 0)
     content_window = curses.newwin(
         full_height, full_content_width, 0, full_sidebar_width
     )
-    sidebar = curses.newpad(height, sidebar_width)
-    sidebar_pos = (1, 2, 1 + height, 2 + sidebar_width)
-    content = curses.newpad(height, content_width)
+    sidebar = curses.newpad(max_lines, sidebar_width)
+    sidebar_pos = (1, 2, height, 2 + sidebar_width)
+    content = curses.newpad(max_lines, content_width)
     content_pos = (
         1, 2 + full_sidebar_width,
-        1 + height, 2 + full_sidebar_width + content_width
+        height, 2 + full_sidebar_width + content_width
     )
 
     # Turn off visible cursor.
-    curses.curs_set(0)
+    curses.curs_set(False)
+
+    # This is the only time the whole screen is ever refreshed. But if you
+    # don't refresh it, screen.getkey will clear it, because curses is awful.
+    screen.refresh()
 
     # Set window borders.
     sidebar_window.border()
@@ -68,6 +73,7 @@ def main(screen):
     # Initial selections.
     selected_feed = 0
     selected_item = 0
+    scroll_position = 0
 
     while True:
         # Print sidebar.
@@ -88,6 +94,8 @@ def main(screen):
         # Print content.
         line = 0
         for i, item in enumerate(current_feed['items']):
+            if line >= max_lines: break
+
             content.addnstr(
                     line, 0, '{:{}}{:%Y-%m-%d %H:%M}'.format(
                     item['title'], content_width - 16, item['date']
@@ -104,50 +112,48 @@ def main(screen):
                     config.get('browser', 'lynx')
                 )
 
-                content.addstr(line, 0, parsed_string)
+                try:
+                    content.addstr(line, 0, parsed_string)
+                except curses.error:
+                    pass    # Lazy way to prevent writing too many buffer lines
+
                 line += parsed_string.count('\n') + 1
 
-        content.noutrefresh(0, 0, *content_pos)
+        # Undo scrolling if content isn't big enough to scroll.
+        scroll_position = max(scroll_position, 0)
+        scroll_position = min(scroll_position, line - height)
+
+        content.noutrefresh(0 + scroll_position, 0, *content_pos)
         curses.doupdate()
 
         # Block, waiting for input.
-        key = content.getch()
+        key = screen.getkey().upper()
 
-        if key == ord('h'):
+        if key == 'Q':
+            break
+        elif key == 'H':
+            content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
             selected_feed = (selected_feed - 1) % len(feeds)
             selected_item = 0
-        if key == ord('l'):
+        elif key == 'L':
+            content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
             selected_feed = (selected_feed + 1) % len(feeds)
             selected_item = 0
-        elif key == ord('j'):
+        elif key == 'J':
             content.clear() # Should be more selective.
             selected_item = (selected_item + 1) % len(current_feed['items'])
-        elif key == ord('k'):
+        elif key == 'K':
             content.clear() # Should be more selective.
             selected_item = (selected_item - 1) % len(current_feed['items'])
+        elif key == 'KEY_DOWN':
+            content.clear() # Should be more selective.
+            scroll_position += 1
+        elif key == 'KEY_UP':
+            content.clear() # Should be more selective.
+            scroll_position -= 1
 
-
-
-
-"""
-When parsing the Ph entry: "He did it again"
-
-Traceback (most recent call last):
-  File "/usr/local/Cellar/python3/3.4.3/Frameworks/Python.framework/Versions/3.4/lib/python3.4/subprocess.py", line 609, in check_output
-    output, unused_err = process.communicate(inputdata, timeout=timeout)
-  File "/usr/local/Cellar/python3/3.4.3/Frameworks/Python.framework/Versions/3.4/lib/python3.4/subprocess.py", line 960, in communicate
-    stdout, stderr = self._communicate(input, endtime, timeout)
-  File "/usr/local/Cellar/python3/3.4.3/Frameworks/Python.framework/Versions/3.4/lib/python3.4/subprocess.py", line 1659, in _communicate
-    self.stdout.encoding)
-  File "/usr/local/Cellar/python3/3.4.3/Frameworks/Python.framework/Versions/3.4/lib/python3.4/subprocess.py", line 888, in _translate_newlines
-    data = data.decode(encoding)
-UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe2 in position 578: invalid continuation byte
-"""
-
-
-    # There are unicode problems.
 
 
 
@@ -164,17 +170,22 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe2 in position 578: invali
     #   up/down: scroll display pad (sidebar should scroll automatically)
     #   r/u: mark as read/unread
     #   s: save/star/unsave/unstar
+    #   o: open in browser
+
+    # open in browser will depend on OS:
+    # xdg-open in ubuntu
+    # open in osx
 
 
 
+    # Warn that this will probably only work in lynx (or implement both...?)
+    # Insert output from jp2a on its own lines before the image tag (leave it)
+    # if it's a JPG:
+    #   jp2a https://spurll.com/Gem.jpg --width=X
+    # otherwise:
+    #   convert http://imgs.xkcd.com/comics/gravitational_waves.png jpg:- | jp2a - --invert --width=X
 
-    # If you want to use Unicode...
-    # import locale
-    # locale.setlocale(locale.LC_ALL, '')
-    # code = locale.getpreferredencoding()
-    # Then use code as the encoding for str.encode() calls.
-    # window.encoding might also be useful.
-
+    # Also include html2text as a parser
 
 
 def parse_feed(xml):
@@ -203,18 +214,19 @@ def parse_html(content, width, browser):
         command = [
             'lynx', '-stdin', '-dump', '-width', str(width), '-image_links'
         ]
+        encoding = 'iso-8859-1'
     elif browser == 'w3m':
         command = ['w3m', '-T', 'text/html', '-dump', '-cols', str(width)]
+        encoding = 'utf-8'
     else:
         Exception('Unsuported browser: {}'.format(browser))
 
-    try:
-        output = subprocess.check_output(
-            command, input=content,
-            universal_newlines=True, stderr=subprocess.STDOUT
-        )
-    except subprocess.CalledProcessError as e:
-        output = 'Unable to parse HTML with {}:\n{}'.format(browser, e.output)
+    output = subprocess.check_output(
+        command,
+        input=content.encode(encoding, 'xmlcharrefreplace'),
+        stderr=subprocess.STDOUT
+    )
+    output = output.decode(encoding, 'xmlcharrefreplace')
 
     return output
 
