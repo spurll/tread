@@ -1,4 +1,4 @@
-TRead
+tread
 =====
 
 A very simple terminal RSS feed reader written in Python 3. It is probably not as good as the others that already exist.
@@ -31,11 +31,12 @@ Feature Requests
 
 * If no terminal web browser/parser is installed, just display the raw HTML
 * Maybe there's a better way to parse the HTML than lynx/w3m
+* Should log errors (and other messages) to a log file
 
 Known Bugs
 ----------
 
-It doesn't work yet.
+* Looks like some Unicode characters aren't working right, such as the title text in this xkcd comic: http://xkcd.com/1647/
 
 License Information
 ===================

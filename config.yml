@@ -8,3 +8,4 @@ timeout: 10
 browser: lynx
 ascii_images: true
 buffer_lines: 1000
+title: TREAD

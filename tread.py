@@ -4,7 +4,7 @@
 # Attribution-ShareAlike 4.0 International License.                    
 
 
-import subprocess, requests, yaml, curses, dateutil, textwrap
+import subprocess, requests, yaml, curses, dateutil, textwrap, sys
 from shutil import get_terminal_size
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
@@ -68,6 +68,8 @@ def main(screen):
     content_window.border()
     sidebar_window.noutrefresh()
     content_window.noutrefresh()
+    title = config.get('title', 'TREAD')
+    screen.addnstr(0, centre(title, full_sidebar_width - 2), title, full_sidebar_width - 2)
     curses.doupdate()
 
     # Initial selections.
@@ -105,6 +107,7 @@ def main(screen):
             line += 1
 
             if i == selected_item:
+                current_item = item
                 line += 1
 
                 parsed_string = parse_html(
@@ -115,7 +118,8 @@ def main(screen):
                 try:
                     content.addstr(line, 0, parsed_string)
                 except curses.error:
-                    pass    # Lazy way to prevent writing too many buffer lines
+                    # Lazy way to prevent writing too many buffer lines. Ugh.
+                    pass
 
                 line += parsed_string.count('\n') + 1
 
@@ -153,7 +157,18 @@ def main(screen):
         elif key == 'KEY_UP':
             content.clear() # Should be more selective.
             scroll_position -= 1
+        elif key == 'O':
+            open_in_browser(current_item['url'])
 
+
+
+    # Write a message function that pops up an overlay window to display a
+    # message and pauses for anykey
+
+
+
+    # Looks like some unicode characters aren't working:
+    # http://xkcd.com/1647/
 
 
 
@@ -171,10 +186,6 @@ def main(screen):
     #   r/u: mark as read/unread
     #   s: save/star/unsave/unstar
     #   o: open in browser
-
-    # open in browser will depend on OS:
-    # xdg-open in ubuntu
-    # open in osx
 
 
 
@@ -229,6 +240,17 @@ def parse_html(content, width, browser):
     output = output.decode(encoding, 'xmlcharrefreplace')
 
     return output
+
+
+def open_in_browser(url):
+    if sys.platform.startswith('linux'):
+        subprocess.Popen(['xdg-open', url])
+    elif sys.platform.startswith('darwin'):
+        subprocess.Popen(['open', url])
+
+
+def centre(text, width):
+    return (width - len(text)) // 2
 
 
 if __name__ == '__main__':
