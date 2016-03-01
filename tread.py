@@ -13,6 +13,8 @@ from dateutil.parser import parse
 def main(screen):
     with open('config.yml') as f:
         config = yaml.load(f)
+        # Ensure config['keys'] exists and make all keys uppercase.
+        config['keys'] = configure_keys(config.get('keys', dict()))
 
     session = requests.Session()
     adapter = requests.adapters.HTTPAdapter(max_retries=config.get('retries'))
@@ -69,7 +71,9 @@ def main(screen):
     sidebar_window.noutrefresh()
     content_window.noutrefresh()
     title = config.get('title', 'TREAD')
-    screen.addnstr(0, centre(title, full_sidebar_width - 2), title, full_sidebar_width - 2)
+    screen.addnstr(
+        0, centre(title, full_sidebar_width - 2), title, full_sidebar_width - 2
+    )
     curses.doupdate()
 
     # Initial selections.
@@ -133,33 +137,38 @@ def main(screen):
         # Block, waiting for input.
         key = screen.getkey().upper()
 
-        if key == 'Q':
-            break
-        elif key == 'H':
+        if key == config['keys']['next_item']:
             content.clear() # Should be more selective.
-            sidebar.clear() # Should be more selective.
-            selected_feed = (selected_feed - 1) % len(feeds)
-            selected_item = 0
-        elif key == 'L':
+            selected_item = (selected_item + 1) % len(current_feed['items'])
+        elif key == config['keys']['prev_item']:
+            content.clear() # Should be more selective.
+            selected_item = (selected_item - 1) % len(current_feed['items'])
+        elif key == config['keys']['next_feed']:
             content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
             selected_feed = (selected_feed + 1) % len(feeds)
             selected_item = 0
-        elif key == 'J':
+        elif key == config['keys']['prev_feed']:
             content.clear() # Should be more selective.
-            selected_item = (selected_item + 1) % len(current_feed['items'])
-        elif key == 'K':
-            content.clear() # Should be more selective.
-            selected_item = (selected_item - 1) % len(current_feed['items'])
-        elif key == 'KEY_DOWN':
+            sidebar.clear() # Should be more selective.
+            selected_feed = (selected_feed - 1) % len(feeds)
+            selected_item = 0
+        elif key == config['keys']['scroll_down']:
             content.clear() # Should be more selective.
             scroll_position += 1
-        elif key == 'KEY_UP':
+        elif key == config['keys']['scroll_up']:
             content.clear() # Should be more selective.
             scroll_position -= 1
-        elif key == 'O':
+        elif key == config['keys']['open_in_browser']:
             open_in_browser(current_item['url'])
-
+        elif key == config['keys']['mark_read']:
+            pass
+        elif key == config['keys']['mark_unread']:
+            pass
+        elif key == config['keys']['star']:
+            pass
+        elif key == config['keys']['quit']:
+            break
 
 
     # Write a message function that pops up an overlay window to display a
@@ -222,9 +231,7 @@ def parse_feed(xml):
 
 def parse_html(content, width, browser):
     if browser in ['lynx']:
-        command = [
-            'lynx', '-stdin', '-dump', '-width', str(width), '-image_links'
-        ]
+        command = ['lynx','-stdin','-dump','-width',str(width),'-image_links']
         encoding = 'iso-8859-1'
     elif browser == 'w3m':
         command = ['w3m', '-T', 'text/html', '-dump', '-cols', str(width)]
@@ -251,6 +258,28 @@ def open_in_browser(url):
 
 def centre(text, width):
     return (width - len(text)) // 2
+
+
+def configure_keys(existing):
+    default = {
+        'next_item': 'J',
+        'prev_item': 'K',
+        'next_feed': 'L',
+        'prev_feed': 'H',
+        'scroll_down': 'KEY_DOWN',
+        'scroll_up': 'KEY_UP',
+        'open_in_browser': 'O',
+        'mark_read': 'R',
+        'mark_unread': 'U',
+        'star': 'S',
+        'quit': 'Q'
+    }
+
+    # Make uppercase.
+    existing = {key: value.upper() for key, value in existing.items()}
+
+    # Return default keys, overwriting with the keys that exist in config.
+    return {**default, **existing}
 
 
 if __name__ == '__main__':
