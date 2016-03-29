@@ -10,103 +10,170 @@ from bs4 import BeautifulSoup
 from dateutil.parser import parse
 
 
-def main(screen):
-    with open('config.yml') as f:
-        config = yaml.load(f)
-        # Ensure config['keys'] exists and make all keys uppercase.
-        config['keys'] = configure_keys(config.get('keys', dict()))
+with open('config.yml') as f:
+    config = yaml.load(f)
 
+
+class Window:
+    border_height = 1
+    border_width = 2
+
+    def __init__(
+        self, screen,
+        height=None, width=None, max_lines=None,
+        row_offset=0, col_offset=0,
+        border=True
+    ):
+        # Size information.
+        self.full_height = height if height is not None else curses.LINES
+        self.full_width = width if width is not None else curses.WIDTH
+        self.max_lines = config.get('buffer_lines', 1000)   # This is a kludge.
+        # TODO: We may need to figure out how to scroll the sidebar.
+
+        # Position information.
+        self.row_offset = row_offset
+        self.col_offset = col_offset
+        self.scroll_pos = 0
+
+        # Curses setup.
+        self.screen = screen
+        self.window = curses.newwin(
+            self.full_height, self.full_width, self.row_offset, self.col_offset
+        )
+        self.pad = curses.newpad(self.max_lines, self.width)
+
+        # Border setup.
+        if border:
+            self.window.border()
+            self.window.noutrefresh()
+            curses.doupdate()
+
+    @property
+    def height(self):
+        return self.full_height - 2 * Window.border_height
+
+    @property
+    def width(self):
+        return self.full_width - 2 * Window.border_width
+
+    def print(self, string, row_offset=0, col_offset=0, attr=curses.A_NORMAL):
+        try:
+            self.pad.addstr(row_offset, col_offset, string, attr)
+        except curses.error:
+            # Lazy way to prevent writing too many buffer lines. Ugh.
+            pass
+
+    def scroll(self, scroll_pos):
+        old_pos = self.scroll_pos
+        self.scroll_pos = scroll_pos
+        self.constrain_scroll()
+
+        if self.scroll_pos != old_pos:
+            self.refresh()
+
+    def scroll_down(self, n=1):
+        self.scroll(self.scroll_pos + n)
+
+    def scroll_up(self, n=1):
+        self.scroll(self.scroll_pos - n)
+
+    def constrain_scroll(self, last_line=None):
+        # Prevent negative scroll.
+        self.scroll_pos = max(self.scroll_pos, 0)
+
+        # Prevent scrolling past the content.
+        if last_line is not None:
+            self.scroll_pos = min(self.scroll_pos, last_line - self.height)
+
+    def clear(self):
+        self.pad.clear()
+
+    def refresh(self):
+        self.pad.noutrefresh(
+            self.scroll_pos, 0,
+            Window.border_height + self.row_offset,
+            Window.border_width + self.col_offset,
+            Window.border_height + self.row_offset + self.height - 1,
+            Window.border_width + self.col_offset + self.width - 1
+        )
+        curses.doupdate()
+
+    def resize(self, height, width):
+        # TODO
+        pass
+
+
+def main(screen):
+    # Set up requests to fetch data with retries.
     session = requests.Session()
     adapter = requests.adapters.HTTPAdapter(max_retries=config.get('retries'))
     session.mount('http://', adapter)
 
+    # Fetch all feed data.
     feeds = list(map(
         lambda url:
             parse_feed(session.get(url, timeout=config.get('timeout')).text),
         config['feeds']
     ))
 
-
-
-    # USE OBJECT ORIENTATION
-    # make your own window objects with refresh methods
-    #   each have pads in them
-    # content and sidebar both inherit these
-    # navigating or changing content triggers refresh
-
-
-
-    # Define screen size.
-    full_width, full_height = curses.COLS, curses.LINES
-    full_sidebar_width = 40
-    full_content_width = full_width - full_sidebar_width
-    sidebar_width = full_sidebar_width - 4
-    content_width = full_content_width - 4
-    height = full_height - 2
-    max_lines = config.get('buffer_lines', 1000)
-
-    # Initialize screen and windows.
-    sidebar_window = curses.newwin(full_height, full_sidebar_width, 0, 0)
-    content_window = curses.newwin(
-        full_height, full_content_width, 0, full_sidebar_width
-    )
-    sidebar = curses.newpad(max_lines, sidebar_width)
-    sidebar_pos = (1, 2, height, 2 + sidebar_width)
-    content = curses.newpad(max_lines, content_width)
-    content_pos = (
-        1, 2 + full_sidebar_width,
-        height, 2 + full_sidebar_width + content_width
-    )
-
-    # Turn off visible cursor.
-    curses.curs_set(False)
+    # Ensure config['keys'] exists and make all keys uppercase.
+    config['keys'] = configure_keys(config.get('keys', dict()))
 
     # This is the only time the whole screen is ever refreshed. But if you
     # don't refresh it, screen.getkey will clear it, because curses is awful.
     screen.refresh()
 
-    # Set window borders.
-    sidebar_window.border()
-    content_window.border()
-    sidebar_window.noutrefresh()
-    content_window.noutrefresh()
-    title = config.get('title', 'TREAD')
+    # Create screen objects.
+    # TODO: Ensure screen is large enough to accommodate sidebar and content.
+    sidebar = Window(screen, width=40, max_lines=200)
+    content = Window(screen, width=curses.COLS - 40, col_offset=40)
+
+    # Add title.
+    title=config.get('title', 'TREAD')
     screen.addnstr(
-        0, centre(title, full_sidebar_width - 2), title, full_sidebar_width - 2
+        0, centre(title, sidebar.full_width), title, sidebar.full_width
     )
-    curses.doupdate()
+
+    # Turn off visible cursor.
+    curses.curs_set(False)
 
     # Initial selections.
     selected_feed = 0
     selected_item = 0
-    scroll_position = 0
+
+
+    # TODO: Feed selection, item selection, etc. should probably be abstracted
+    # into an object as well. These loops are really awkward, as is the line-
+    # counting.
+
 
     while True:
         # Print sidebar.
         for i, feed in enumerate(feeds):
-            sidebar.addnstr(
-                i, 0, '{:{}}'.format(feed['title'], sidebar_width),
-                sidebar_width,
-                curses.A_REVERSE if i == selected_feed else curses.A_BOLD
+            sidebar.print(
+                '{:{}}'.format(feed['title'], sidebar.width),
+                row_offset=i,
+                attr=curses.A_REVERSE if i == selected_feed else curses.A_BOLD
             )
 
             if i == selected_feed:
                 current_feed = feed
 
         # Refresh sidebar.
-        sidebar.noutrefresh(0, 0, *sidebar_pos)
-        curses.doupdate()
+        sidebar.refresh()
 
         # Print content.
         line = 0
         for i, item in enumerate(current_feed['items']):
-            if line >= max_lines: break
+            if line >= content.max_lines: break
+            # TODO: This is a terrible kludge. At least warn or something.
 
-            content.addnstr(
-                    line, 0, '{:{}}{:%Y-%m-%d %H:%M}'.format(
-                    item['title'], content_width - 16, item['date']
-                ), content_width,
-                curses.A_REVERSE if i == selected_item else curses.A_BOLD
+            content.print(
+                '{:{}}{:%Y-%m-%d %H:%M}'.format(
+                    item['title'], content.width - 16, item['date']
+                ),
+                row_offset=line,
+                attr=curses.A_REVERSE if i == selected_item else curses.A_BOLD
             )
             line += 1
 
@@ -114,25 +181,20 @@ def main(screen):
                 current_item = item
                 line += 1
 
+                # Parse the HTML content.
                 parsed_string = parse_html(
-                    item['content'], content_width,
+                    item['content'], content.width,
                     config.get('browser', 'lynx')
                 )
 
-                try:
-                    content.addstr(line, 0, parsed_string)
-                except curses.error:
-                    # Lazy way to prevent writing too many buffer lines. Ugh.
-                    pass
+                # Print it to the screen.
+                content.print(parsed_string, row_offset=line)
 
                 line += parsed_string.count('\n') + 1
 
         # Undo scrolling if content isn't big enough to scroll.
-        scroll_position = max(scroll_position, 0)
-        scroll_position = min(scroll_position, line - height)
-
-        content.noutrefresh(0 + scroll_position, 0, *content_pos)
-        curses.doupdate()
+        content.constrain_scroll(line)
+        content.refresh()
 
         # Block, waiting for input.
         key = screen.getkey().upper()
@@ -155,10 +217,10 @@ def main(screen):
             selected_item = 0
         elif key == config['keys']['scroll_down']:
             content.clear() # Should be more selective.
-            scroll_position += 1
+            content.scroll_down()
         elif key == config['keys']['scroll_up']:
             content.clear() # Should be more selective.
-            scroll_position -= 1
+            content.scroll_up()
         elif key == config['keys']['open_in_browser']:
             open_in_browser(current_item['url'])
         elif key == config['keys']['mark_read']:

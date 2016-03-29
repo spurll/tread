@@ -1,5 +1,10 @@
 feeds:
+  - http://whatever.scalzi.com/feed
   - http://freethoughtblogs.com/pharyngula/feed/
+  - http://the-orbit.net/greta/feed/
+  - http://the-orbit.net/lousycanuck/feed/
+  - http://dietitianathome.wordpress.com/feed/
+  - http://winnipegskeptics.com/feed/
   - http://xkcd.com/rss.xml
   - http://boingboing.net/feed
 
