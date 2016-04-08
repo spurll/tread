@@ -9,7 +9,7 @@ Installation
 Instructions
 ------------
 
-Add the desired feeds to `config.yml` and ensure that the requirements are satisfied (`j2pa` is required if `ascii_images` is set to `true` in `config.yml`, and either `lynx` or `w3m` is required to do basic parsing of HTML content).
+Add the desired feeds to `config.yml` and ensure that the requirements are satisfied (either `lynx` or `w3m` is required to do basic parsing of HTML content).
 
 Run `python3 tread.py`.
 
@@ -20,7 +20,7 @@ Requirements
 * python-dateutil
 * requests
 * beautifulsoup4
-* j2pa (optional)
+* [imgii](https://github.com/spurll/imgii)
 * lynx (or w3m)
 
 Bugs and Feature Requests

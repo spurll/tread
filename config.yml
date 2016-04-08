@@ -7,23 +7,24 @@ feeds:
   - http://winnipegskeptics.com/feed/
   - http://xkcd.com/rss.xml
   - http://boingboing.net/feed
+  - http://feeds.feedburner.com/wondermark
 
 keys:
-  next_item: J
   prev_item: K
-  next_feed: L
+  next_item: J
   prev_feed: H
-  scroll_down: KEY_DOWN
+  next_feed: L
   scroll_up: KEY_UP
-  open_in_browser: O
+  scroll_down: KEY_DOWN
   mark_read: R
   mark_unread: U
   star: S
+  open_in_browser: O
   quit: Q
 
 retries: 10
 timeout: 10
+refresh: 10
 browser: lynx
 ascii_images: true
 buffer_lines: 1000
-title: TREAD
