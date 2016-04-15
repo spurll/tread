@@ -9,13 +9,16 @@ Installation
 Instructions
 ------------
 
+TODO: Add package installation instructions.
+
 Add the desired feeds to `config.yml` and ensure that the requirements are satisfied (either `lynx` or `w3m` is required to do basic parsing of HTML content).
 
-Run `python3 tread.py`.
+Once installed, run `tread`.
 
 Requirements
 ------------
 
+* Python 3.5
 * pyyaml
 * python-dateutil
 * requests

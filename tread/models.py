@@ -10,8 +10,8 @@ class Window:
     border_width = 2
 
     def __init__(
-        self, screen, height=None, width=None, max_lines=None, row_offset=0,
-        col_offset=0, border=True, title=''
+        self, screen, height=None, width=None, row_offset=0, col_offset=0,
+        max_lines=None, border=True, title=''
     ):
         # Size information.
         self.full_height = height if height is not None else curses.LINES
@@ -41,14 +41,12 @@ class Window:
         )
         self.pad = curses.newpad(self.max_lines, self.width)
 
-        # Border setup.
-        if border:
-            self.refresh_border()
-
-        # Title setup.
+        # Border and title setup.
+        self.border = border
         self.title = title
-        if title:
-            self.refresh_title()
+
+        # Refreshing border also refreshes the title.
+        self.refresh_border()
 
     @property
     def height(self):
@@ -91,28 +89,53 @@ class Window:
         self.pad.clear()
 
     def refresh(self):
-        self.pad.noutrefresh(
-            self.scroll_pos, 0,
-            Window.border_height + self.row_offset,
-            Window.border_width + self.col_offset,
-            Window.border_height + self.row_offset + self.height - 1,
-            Window.border_width + self.col_offset + self.width - 1
-        )
-        curses.doupdate()
+        try:
+            self.pad.refresh(
+                self.scroll_pos, 0,
+                Window.border_height + self.row_offset,
+                Window.border_width + self.col_offset,
+                Window.border_height + self.row_offset + self.height - 1,
+                Window.border_width + self.col_offset + self.width - 1
+            )
+        except:
+            # Curses is garbage.
+            pass
 
     def refresh_border(self):
-        self.window.border()
-        self.window.noutrefresh()
-        curses.doupdate()
+        if self.border:
+            self.window.border()
 
-    def refresh_title(self):
-        self.window.addstr(0, centre(self.title, self.full_width), self.title)
-        self.window.noutrefresh()
-        curses.doupdate()
+        if self.title:
+            self.window.addstr(0, self.centre(self.title), self.title)
 
-    def resize(self, height, width):
-        # TODO
-        pass
+        self.window.refresh()
+
+    def centre(self, text):
+        return (self.full_width - len(text)) // 2
+
+    def resize(
+        self, new_height, new_width, new_row_offset=None, new_col_offset=None
+    ):
+        self.full_height = new_height
+        self.full_width = new_width
+
+        if new_row_offset is not None:
+            self.row_offset = new_row_offset
+
+        if new_col_offset is not None:
+            self.col_offset = new_col_offset
+
+        # These should probably be resize (and move) calls, but that's
+        # complicated and (apparently) not recommended.
+        del self.window
+        self.window = curses.newwin(
+            self.full_height, self.full_width, self.row_offset, self.col_offset
+        )
+
+        del self.pad
+        self.pad = curses.newpad(self.max_lines, self.width)
+
+        self.refresh_border()
 
 
 class Feed:
@@ -206,7 +229,3 @@ class Item:
         output = output.decode(encoding, 'xmlcharrefreplace')
 
         return output
-
-
-def centre(text, width):
-    return (width - len(text)) // 2

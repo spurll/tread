@@ -57,7 +57,6 @@ def main(screen, config_file):
     selected_feed = 0
     selected_item = 0
 
-
     # TODO: Feed selection, item selection, etc. should probably be abstracted
     # into an object as well. These loops are really awkward, as is the line-
     # counting.
@@ -89,6 +88,8 @@ def main(screen, config_file):
             content.write(
                 '{:{}}{:%Y-%m-%d %H:%M}'.format(
                     item.title, content.width - 16, item.date
+                ) if len(item.title) + 16 < content.width else '{:{}}'.format(
+                    item.title, content.width
                 ),
                 row_offset=line,
                 attr=curses.A_REVERSE if i == selected_item else curses.A_BOLD
@@ -112,9 +113,17 @@ def main(screen, config_file):
         content.refresh()
 
         # Block, waiting for input.
-        key = screen.getkey().upper()
+        try:
+            key = screen.getkey().upper()
+        except:
+            # On resize, getkey screws up once (maybe more).
+            pass
 
-        if key == config['keys']['next_item']:
+        if key == 'KEY_RESIZE':
+            resize(content, sidebar, menu)
+            menu.write(menu_text(config['keys'], menu.width))
+            menu.refresh()
+        elif key == config['keys']['next_item']:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item + 1) % len(current_feed.items)
@@ -152,50 +161,43 @@ def main(screen, config_file):
         elif key == config['keys']['quit']:
             break
 
-        sidebar.refresh_border()
-        sidebar.refresh_title()
 
-    # Write a message function that pops up an overlay window to display a
-    # message and pauses for anykey (or enter?)
+    # TODO: Write a message function that pops up an overlay window to display
+    # a message and pauses for anykey (or enter?)
 
 
 
-    # Looks like some unicode characters aren't working:
+    # TODO: Looks like some unicode characters aren't working:
     # http://xkcd.com/1647/
 
 
 
-    # In the DB should store/use guids.
+    # TODO: In the DB should store/use guids.
     # Should probably store all of the articles in the DB, and sync them with
     # feeds on launch and on demand.
 
-    # Do something about resize!
 
-
-    # Warn that this will probably only work in lynx (or implement both...?)
+    # TODO: Warn that this will probably only work in lynx (or implement both...?)
     # Insert output from image conversion on its own lines before the image tag
     # (leave it)
     # use image_to_ascii()
 
-    # Also include html2text as a parser
+    # TODO: Also include html2text as a parser
 
 
 
 def init_windows(screen, buffer_lines):
-    menu_items = 7
-    menu_height = menu_items + 2 * Window.border_height
-
     content = Window(
-        screen, width=-41, max_lines=buffer_lines, col_offset=41, title='TREAD'
+        screen, *content_dimensions(), max_lines=buffer_lines, title='TREAD'
     )
 
     sidebar = Window(
-        screen, width=40, height=-menu_height, max_lines=200, title='FEEDS'
+        screen, *sidebar_dimensions(), max_lines=200, title='FEEDS'
     )
 
     menu = Window(
-        screen, width=40, height=menu_height, row_offset=-menu_height,
-        max_lines=menu_items, title='KEYS'
+        screen, *menu_dimensions(), max_lines=7 + 2 * Window.border_height,
+        title='KEYS'
     )
 
     return (content, sidebar, menu)
@@ -232,7 +234,7 @@ def configure_keys(existing):
 
 def menu_text(keys, width):
     key_width = 17
-    value_width = width - key_width
+    value_width = max(0, width - key_width)
     menu_format = '{:<{}}{:>{}}'
 
     menu = [
@@ -264,3 +266,35 @@ def menu_text(keys, width):
     ]
 
     return ''.join(menu)
+
+
+# This is awful.
+def resize(content, sidebar, menu):
+    curses.update_lines_cols()  # Requires Python 3.5.
+    sidebar.resize(*sidebar_dimensions())
+    menu.resize(*menu_dimensions())
+    content.resize(*content_dimensions())
+
+
+def sidebar_width():
+    # Sidebar and menu width should be 50% of screen up to a desired maximum.
+    return min(40, curses.COLS // 2)
+
+
+def menu_height():
+    # Menu height should be 50% of screen up to the number of menu items.
+    return min(7 + 2 * Window.border_height, curses.LINES // 2)
+
+
+def sidebar_dimensions():
+    return (curses.LINES - menu_height(), sidebar_width(), 0, 0)
+
+
+def menu_dimensions():
+    return (menu_height(), sidebar_width(), curses.LINES - menu_height(), 0)
+
+
+def content_dimensions():
+    return (
+        curses.LINES, curses.COLS - sidebar_width() - 1, 0, sidebar_width() + 1
+    )
