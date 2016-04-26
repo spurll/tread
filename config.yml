@@ -1,13 +1,22 @@
 feeds:
-  - http://whatever.scalzi.com/feed
-  - http://freethoughtblogs.com/pharyngula/feed/
-  - http://the-orbit.net/greta/feed/
-  - http://the-orbit.net/lousycanuck/feed/
-  - http://dietitianathome.wordpress.com/feed/
-  - http://winnipegskeptics.com/feed/
-  - http://xkcd.com/rss.xml
-  - http://boingboing.net/feed
-  - http://feeds.feedburner.com/wondermark
+  - name: Whatever
+    url: http://whatever.scalzi.com/feed
+  - name: Pharyngula
+    url: http://freethoughtblogs.com/pharyngula/feed/
+  - name: Greta Christina's Blog
+    url: http://the-orbit.net/greta/feed/
+  - name: Lousy Canuck
+    url: http://the-orbit.net/lousycanuck/feed/
+  - name: Dietitian at Home
+    url: http://dietitianathome.wordpress.com/feed/
+  - name: Winnipeg Skeptics Blog
+    url: http://winnipegskeptics.com/feed/
+  - name: xkcd
+    url: http://xkcd.com/rss.xml
+  - name: Wondermark
+    url: http://feeds.feedburner.com/wondermark
+  - name: Boing Boing
+    url: http://boingboing.net/feed
 
 keys:
   prev_item: K
@@ -22,9 +31,10 @@ keys:
   open_in_browser: O
   quit: Q
 
+database: ~/.tread.db
+browser: lynx
 retries: 10
 timeout: 10
 refresh: 10
-browser: lynx
 ascii_images: true
 buffer_lines: 1000

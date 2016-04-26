@@ -1,21 +1,51 @@
-import subprocess, requests, yaml, curses, textwrap, sys
+#!/usr/bin/env python3
 
-from tread.models import Window, Feed, Item
+# Written by Gem Newman. This work is licensed under a Creative Commons         
+# Attribution-ShareAlike 4.0 International License.                    
+
+
+import subprocess, requests, yaml, curses, textwrap, sys, os
+from argparse import ArgumentParser
+from functools import partial
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from models import Base, Window, Feed, Item
+
+
+def console_main():
+    parser = ArgumentParser(description='A simple terminal feed reader.')
+    parser.add_argument(
+        'config', nargs='?', help='Path to the configuration file to use. '
+        'Defaults to ~/.tread.yml.', default='~/.tread.yml'
+    )
+    args = parser.parse_args()
+
+    curses.wrapper(partial(main, config_file=os.path.expanduser(args.config)))
 
 
 def main(screen, config_file):
+    # Load configuration.
     with open(config_file) as f:
         config = yaml.load(f)
 
     # Ensure config['keys'] exists and make all keys uppercase.
     config['keys'] = configure_keys(config.get('keys', dict()))
 
+    # Set up database and session.
+    db_path = os.path.expanduser(config.get('database', '~/.tread.db'))
+    db_uri = 'sqlite:///{}'.format(db_path)
+    engine = create_engine(db_uri)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    db_session = Session()
+
     # Set up requests to fetch data with retries.
-    session = requests.Session()
+    www_session = requests.Session()
     adapter = requests.adapters.HTTPAdapter(
         max_retries=config.get('retries', 10)
     )
-    session.mount('http://', adapter)
+    www_session.mount('http://', adapter)
 
     # This is the only time the whole screen is ever refreshed. But if you
     # don't refresh it, screen.getkey will clear it, because curses is awful.
@@ -25,7 +55,6 @@ def main(screen, config_file):
     curses.curs_set(False)
 
     # Create screen objects.
-    # TODO: Ensure screen is large enough to accommodate sidebar and content.
     content, sidebar, menu = init_windows(
         screen, config.get('buffer_lines', 1000)
     )
@@ -34,20 +63,20 @@ def main(screen, config_file):
     menu.write(menu_text(config['keys'], menu.width))
     menu.refresh()
 
-    # TODO
-    # For each feed in config, load contents from the DB.
-    # Mark all as "needs refresh".
-    # Since the top one is selected, refresh it.
-    # Proceed to display.
 
+    # TODO
+    # Add loading message
+    # Store "last refreshed" in Feed element in DB
+    # Fetch feeds from DB
+    # Fetch current feed items from DB (should trigger web call if needs refresh)
 
     # Fetch all feed data.
     feeds = [
         Feed(
-            url, session, config.get('refresh_rate', 10),
-            config.get('timeout'), config.get('browser', 'lynx')
+            feed.get('name', feed['url']), feed['url'], www_session,
+            config.get('refresh_rate', 10), config.get('timeout')
         )
-        for url in config['feeds']
+        for feed in config['feeds']
     ]
 
     # Initial selections.
@@ -101,7 +130,9 @@ def main(screen, config_file):
                 line += 1
 
                 # Parse the HTML content.
-                parsed_string = item.display_content(content.width)
+                parsed_string = parse_content(
+                    item.content, config.get('browser', 'lynx'), content.width
+                )
 
                 # Print it to the screen.
                 content.write(parsed_string, row_offset=line)
@@ -203,6 +234,28 @@ def init_windows(screen, buffer_lines):
     return (content, sidebar, menu)
 
 
+def parse_content(content, browser, width):
+    if browser == 'lynx':
+        command = [
+            'lynx', '-stdin', '-dump', '-width', str(width), '-image_links'
+        ]
+        encoding = 'iso-8859-1'
+    elif browser == 'w3m':
+        command = ['w3m', '-T', 'text/html', '-dump', '-cols', str(width)]
+        encoding = 'utf-8'
+    else:
+        Exception('Unsuported browser: {}'.format(browser))
+
+    output = subprocess.check_output(
+        command,
+        input=content.encode(encoding, 'xmlcharrefreplace'),
+        stderr=subprocess.STDOUT
+    )
+    output = output.decode(encoding, 'xmlcharrefreplace')
+
+    return output
+
+
 def open_in_browser(url):
     if sys.platform.startswith('linux'):
         subprocess.Popen(['xdg-open', url])
@@ -298,3 +351,7 @@ def content_dimensions():
     return (
         curses.LINES, curses.COLS - sidebar_width() - 1, 0, sidebar_width() + 1
     )
+
+
+if __name__ == '__main__':
+    console_main()

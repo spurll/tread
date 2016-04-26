@@ -1,8 +1,92 @@
-import curses, subprocess
+import curses
 from dateutil.parser import parse
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from imgii import image_to_ascii
+from sqlalchemy import Column, ForeignKey, Integer, Unicode, UnicodeText, Date
+from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declarative_base
+
+
+Base = declarative_base()
+
+
+class Feed(Base):
+    __tablename__ = 'feeds'
+
+    id = Column(Integer, primary_key=True)
+    title = Column(Unicode)
+    url = Column(Unicode)
+    main_url = Column(Unicode)
+    description = Column(UnicodeText)
+    last_refresh = Column(Date)
+
+    items = relationship('Item', order_by='Item.date', back_populates='feed')
+
+    def __init__(self, title, url, www_session, refresh_rate=10, timeout=None):
+        self.title = title
+        self.url = url
+        self.main_url = ''
+        self.description = ''
+
+        self.www_session = www_session
+        self.refresh_rate = timedelta(minutes=refresh_rate)
+        self.timeout = timeout
+
+        self.last_refresh = None
+
+    # TODO: Distinguish between load and refresh? When does stuff get loaded from DB?
+
+    # Update object from web and write back to DB.
+    def refresh(self, force=False):
+        if not force and not self.needs_refresh:
+            return
+
+        xml = self.www_session.get(self.url, timeout=self.timeout).text
+        soup = BeautifulSoup(xml, 'html.parser')
+
+        # Nope, just use the title from the config file.
+        # self.title = soup.channel.title.string
+
+        self.main_url = soup.channel.link.string
+        self.description = soup.channel.description.string
+        self.items = [
+            Item(
+                title=item.title.string,
+                url=item.link.string,
+                guid=item.guid.string,
+                date=parse(item.pubdate.string).astimezone(tz=None),
+                content=(
+                    item.find('content:encoded') or item.description
+                ).string
+            )
+            for item in soup.find_all('item')
+        ]
+
+        self.last_refresh = datetime.now()
+
+        # TODO: Write back to DB.
+        # Remind yourself how anything ever gets written to DB.
+
+    @property
+    def needs_refresh(self):
+        return (self.last_refresh is None) or (
+            datetime.now() - self.last_refresh >= self.refresh_rate
+        )
+
+
+class Item(Base):
+    __tablename__ = 'items'
+
+    id = Column(Integer, primary_key=True)
+    title = Column(Unicode)
+    url = Column(Unicode)
+    guid = Column(Unicode)
+    date = Column(Date)
+    content = Column(UnicodeText)
+
+    feed_id = Column(Integer, ForeignKey('feeds.id'))
+    feed = relationship('Feed', back_populates='items')
 
 
 class Window:
@@ -136,96 +220,3 @@ class Window:
         self.pad = curses.newpad(self.max_lines, self.width)
 
         self.refresh_border()
-
-
-class Feed:
-    def __init__(
-        self, url, session, refresh_rate=10, timeout=None,
-        browser='lynx'
-    ):
-        self.url = url
-        self.main_url = ''
-        self.title = url
-        self.description = ''
-        self.items = []
-
-        self.session = session
-        self.refresh_rate = timedelta(minutes=refresh_rate)
-        self.timeout = timeout
-        self.browser = browser
-
-        self.last_refresh = None
-        self.refresh(title_only=True)
-        # TODO: This is just as slow as loading the whole thing. Use the DB.
-
-
-    # TODO: Distinguish between load and refresh? When does stuff get loaded from DB?
-
-
-    # Update object from web and write back to DB.
-    def refresh(self, title_only=False, force=False):
-        if not force and not self.needs_refresh:
-            return
-
-        xml = self.session.get(self.url, timeout=self.timeout).text
-        soup = BeautifulSoup(xml, 'html.parser')
-
-        self.title = soup.channel.title.string
-
-        if title_only:
-            return
-
-        self.main_url = soup.channel.link.string
-        self.description = soup.channel.description.string
-        self.items = [
-            Item(
-                self.browser,
-                item.title.string,
-                item.link.string,
-                parse(item.pubdate.string).astimezone(tz=None),
-                item.guid.string,
-                (item.find('content:encoded') or item.description).string
-            )
-            for item in soup.find_all('item')
-        ]
-
-        self.last_refresh = datetime.now()
-
-        # TODO: Write back to DB.
-
-    @property
-    def needs_refresh(self):
-        return (self.last_refresh is None) or (
-            datetime.now() - self.last_refresh >= self.refresh_rate
-        )
-
-
-class Item:
-    def __init__(self, browser, title, url, date, guid, content):
-        self.browser = browser
-        self.title = title
-        self.url = url
-        self.date = date
-        self.guid = guid
-        self.content = content
-
-    def display_content(self, width):
-        if self.browser == 'lynx':
-            command = [
-                'lynx', '-stdin', '-dump', '-width', str(width), '-image_links'
-            ]
-            encoding = 'iso-8859-1'
-        elif browser == 'w3m':
-            command = ['w3m', '-T', 'text/html', '-dump', '-cols', str(width)]
-            encoding = 'utf-8'
-        else:
-            Exception('Unsuported browser: {}'.format(self.browser))
-
-        output = subprocess.check_output(
-            command,
-            input=self.content.encode(encoding, 'xmlcharrefreplace'),
-            stderr=subprocess.STDOUT
-        )
-        output = output.decode(encoding, 'xmlcharrefreplace')
-
-        return output
