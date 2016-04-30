@@ -26,7 +26,7 @@ HTML content).
 Basic Usage
 -----------
 
-Once installed, run `tread`. If your configuration file isn't located at 
+Once installed, run `tread`. If your configuration file isn't located at
 `~/.tread.yml`, you may specify a file at runtime: `tread config.yml`.
 
 Updating Feeds
@@ -58,6 +58,7 @@ Bugs and Feature Requests
 Feature Requests
 ----------------
 
+* Add support for ATOM feeds
 * Add ability to (and instructions for) running a cron job to check feeds and
   update the DB regularly even if the main feed reader isn't invoked
 * If no terminal web browser/parser is installed, just display the raw HTML

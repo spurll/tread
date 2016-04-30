@@ -7,6 +7,7 @@
 import subprocess, requests, yaml, curses, textwrap, sys, os
 from argparse import ArgumentParser
 from functools import partial
+from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -66,22 +67,31 @@ def main(screen, config_file):
 
     # TODO
     # Add loading message
-    # Store "last refreshed" in Feed element in DB
     # Fetch feeds from DB
     # Fetch current feed items from DB (should trigger web call if needs refresh)
 
-    # Fetch all feed data.
-    feeds = [
-        Feed(
-            feed.get('name', feed['url']), feed['url'], www_session,
-            config.get('refresh_rate', 10), config.get('timeout')
-        )
-        for feed in config['feeds']
-    ]
+    # Add read/starred state to display
+    # Ensure that things work fine offline if queries fail
+    # Add something that marks things as read (if you spent more than 10 seconds on them?)
+
+
+    # Load feeds from the DB.
+    feeds = []
+    for feed in config['feeds']:
+        row = db_session.query(Feed).filter(Feed.url == feed['url']).scalar()
+
+        if row:
+            row.name = feed.get('name', row.name)
+        else:
+            row = Feed(feed.get('name', feed['url']), feed['url'])
+            db_session.add(row)
+            db_session.commit()
+
+        feeds.append(row)
 
     # Initial selections.
     if len(feeds) > 0:
-        feeds[0].refresh()
+        feeds[0].refresh(db_session, www_session, config.get('timeout'))
 
     selected_feed = 0
     selected_item = 0
@@ -90,14 +100,13 @@ def main(screen, config_file):
     # into an object as well. These loops are really awkward, as is the line-
     # counting.
 
-
     while True:
         current_item = None
 
         # Print sidebar.
         for i, feed in enumerate(feeds):
             sidebar.write(
-                '{:{}}'.format(feed.title, sidebar.width),
+                '{:{}}'.format(feed.name, sidebar.width),
                 row_offset=i,
                 attr=curses.A_REVERSE if i == selected_feed else curses.A_BOLD
             )
@@ -154,58 +163,83 @@ def main(screen, config_file):
             resize(content, sidebar, menu)
             menu.write(menu_text(config['keys'], menu.width))
             menu.refresh()
+
         elif key == config['keys']['next_item']:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item + 1) % len(current_feed.items)
+
         elif key == config['keys']['prev_item']:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item - 1) % len(current_feed.items)
+
         elif key == config['keys']['next_feed']:
             content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
+
             selected_feed = (selected_feed + 1) % len(feeds)
             selected_item = 0
-            feeds[selected_feed].refresh()
+
+            # TODO: Time zone stuff.
+            # TODO: Do we need pytz? If so, add to requirements.
+            if (feeds[selected_feed].last_refresh is None) or (
+                datetime.utcnow() - feeds[selected_feed].last_refresh >
+                    timedelta(minutes=config.get('refresh_rate', 10))
+            ):
+                feeds[selected_feed].refresh(
+                    db_session, www_session, config.get('timeout')
+                )
+
         elif key == config['keys']['prev_feed']:
             content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
+
             selected_feed = (selected_feed - 1) % len(feeds)
             selected_item = 0
-            feeds[selected_feed].refresh()
+
+            if (feeds[selected_feed].last_refresh is None) or (
+                datetime.utcnow() - feeds[selected_feed].last_refresh >
+                    timedelta(minutes=config.get('refresh_rate', 10))
+            ):
+                feeds[selected_feed].refresh(
+                    db_session, www_session, config.get('timeout')
+                )
+
         elif key == config['keys']['scroll_down']:
             content.clear() # Should be more selective.
             content.scroll_down()
+
         elif key == config['keys']['scroll_up']:
             content.clear() # Should be more selective.
             content.scroll_up()
+
         elif key == config['keys']['open_in_browser']:
             if current_item is not None:
                 open_in_browser(current_item.url)
+
         elif key == config['keys']['mark_read']:
             pass    # TODO
+
         elif key == config['keys']['mark_unread']:
             pass    # TODO
+
         elif key == config['keys']['star']:
             pass    # TODO
+
         elif key == config['keys']['quit']:
             break
 
 
     # TODO: Write a message function that pops up an overlay window to display
     # a message and pauses for anykey (or enter?)
+    # Or maybe just have a permenant message area at the bottom.
 
 
 
     # TODO: Looks like some unicode characters aren't working:
     # http://xkcd.com/1647/
 
-
-
-    # TODO: In the DB should store/use guids.
-    # Should probably store all of the articles in the DB, and sync them with
-    # feeds on launch and on demand.
 
 
     # TODO: Warn that this will probably only work in lynx (or implement both...?)

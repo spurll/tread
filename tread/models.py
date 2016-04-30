@@ -1,9 +1,10 @@
 import curses
 from dateutil.parser import parse
-from datetime import datetime, timedelta
+from datetime import datetime
 from bs4 import BeautifulSoup
 from imgii import image_to_ascii
-from sqlalchemy import Column, ForeignKey, Integer, Unicode, UnicodeText, Date
+from sqlalchemy import Column, ForeignKey
+from sqlalchemy import Integer, Unicode, UnicodeText, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -15,75 +16,88 @@ class Feed(Base):
     __tablename__ = 'feeds'
 
     id = Column(Integer, primary_key=True)
-    title = Column(Unicode)
-    url = Column(Unicode)
+    url = Column(Unicode, index=True)
+    name = Column(Unicode)
     main_url = Column(Unicode)
     description = Column(UnicodeText)
-    last_refresh = Column(Date)
+    last_refresh = Column(DateTime)
 
-    items = relationship('Item', order_by='Item.date', back_populates='feed')
+    items = relationship(
+        'Item', order_by='desc(Item.date)', back_populates='feed'
+    )
 
-    def __init__(self, title, url, www_session, refresh_rate=10, timeout=None):
-        self.title = title
+    def __init__(self, name, url):
+        self.name = name
         self.url = url
         self.main_url = ''
         self.description = ''
-
-        self.www_session = www_session
-        self.refresh_rate = timedelta(minutes=refresh_rate)
-        self.timeout = timeout
-
         self.last_refresh = None
 
-    # TODO: Distinguish between load and refresh? When does stuff get loaded from DB?
-
     # Update object from web and write back to DB.
-    def refresh(self, force=False):
-        if not force and not self.needs_refresh:
+    def refresh(self, db_session, www_session, timeout):
+        r = www_session.get(self.url, timeout=timeout)
+
+        if r.status_code != 200:
+            # TODO: Send "unable to refresh" message.
             return
 
-        xml = self.www_session.get(self.url, timeout=self.timeout).text
+        xml = r.text
         soup = BeautifulSoup(xml, 'html.parser')
 
-        # Nope, just use the title from the config file.
-        # self.title = soup.channel.title.string
+        # TODO: Add support for ATOM feeds as well.
+
+        # Nope, just use the name from the config file.
+        # self.name = soup.channel.name.string
 
         self.main_url = soup.channel.link.string
         self.description = soup.channel.description.string
-        self.items = [
-            Item(
-                title=item.title.string,
-                url=item.link.string,
-                guid=item.guid.string,
-                date=parse(item.pubdate.string).astimezone(tz=None),
-                content=(
+
+        for item in soup.find_all('item'):
+            guid = item.guid.string
+            row = db_session.query(Item).filter(Item.feed_id == self.id) \
+                .filter(Item.guid == guid).scalar()
+
+            if row:
+                # Update the item.
+                row.title = item.title.string
+                row.url = item.link.string
+                row.date = parse(item.pubdate.string)
+                row.content = (
                     item.find('content:encoded') or item.description
                 ).string
-            )
-            for item in soup.find_all('item')
-        ]
 
-        self.last_refresh = datetime.now()
+            else:
+                # Create the item.
+                row = Item(
+                    guid=guid,
+                    title=item.title.string,
+                    url=item.link.string,
+                    date=parse(item.pubdate.string),
+                    content=(
+                        item.find('content:encoded') or item.description
+                    ).string
+                )
+                self.items.append(row)
 
-        # TODO: Write back to DB.
-        # Remind yourself how anything ever gets written to DB.
+        # Feed has been refreshed.
+        self.last_refresh = datetime.utcnow()
 
-    @property
-    def needs_refresh(self):
-        return (self.last_refresh is None) or (
-            datetime.now() - self.last_refresh >= self.refresh_rate
-        )
+        # Write back to DB.
+        db_session.add(self)
+        db_session.commit()
 
 
 class Item(Base):
     __tablename__ = 'items'
 
     id = Column(Integer, primary_key=True)
+    guid = Column(Unicode, index=True)
     title = Column(Unicode)
     url = Column(Unicode)
-    guid = Column(Unicode)
-    date = Column(Date)
+    date = Column(DateTime)
     content = Column(UnicodeText)
+    read = Column(Boolean, default=False)
+    starred = Column(Boolean, default=False)
 
     feed_id = Column(Integer, ForeignKey('feeds.id'))
     feed = relationship('Feed', back_populates='items')
