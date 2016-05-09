@@ -34,11 +34,20 @@ class Feed(Base):
         self.last_refresh = None
 
     # Update object from web and write back to DB.
-    def refresh(self, db_session, www_session, timeout):
-        r = www_session.get(self.url, timeout=timeout)
+    def refresh(self, db_session, www_session, timeout, log):
+        log('Refreshing {}...'.format(self.name))
+        try:
+            r = www_session.get(self.url, timeout=timeout)
+        except:
+            log('Unable to refresh: no response from {}.'.format(self.url))
+            return
 
         if r.status_code != 200:
-            # TODO: Send "unable to refresh" message.
+            log(
+                'Unable to refresh: {} responded with {}.'.format(
+                    self.url, r.status_code
+                )
+            )
             return
 
         xml = r.text
@@ -109,18 +118,19 @@ class Window:
 
     def __init__(
         self, screen, height=None, width=None, row_offset=0, col_offset=0,
-        max_lines=None, border=True, title=''
+        max_lines=1000, border=True, title=''
     ):
         # Size information.
         self.full_height = height if height is not None else curses.LINES
         self.full_width = width if width is not None else curses.COLS
-        self.max_lines = max_lines      # This is a kludge.
+        self.max_lines = max_lines
         # TODO: We may need to figure out how to scroll the sidebar.
 
         # Position information.
         self.row_offset = row_offset
         self.col_offset = col_offset
         self.scroll_pos = 0
+        self.next_row = 0
 
         # Size/offset may be defined relative to full size of terminal.
         if self.full_height < 0:
@@ -154,12 +164,27 @@ class Window:
     def width(self):
         return self.full_width - 2 * Window.border_width
 
-    def write(self, string, row_offset=0, col_offset=0, attr=curses.A_NORMAL):
+    def write(
+        self, string, row_offset=None, col_offset=0, attr=curses.A_NORMAL,
+        autoscroll=False
+    ):
+        if row_offset is None:
+            row_offset = self.next_row
+
         try:
             self.pad.addstr(row_offset, col_offset, string, attr)
         except curses.error:
             # Lazy way to prevent writing too many buffer lines. Ugh.
-            pass
+            self.max_lines += 10
+            self.pad.resize(self.max_lines, self.width)
+            self.pad.addstr(row_offset, col_offset, string, attr)
+
+        self.next_row = row_offset + 1
+        # TODO: Shouldn't be +1: should figure out if it's a multiline thing.
+
+        if autoscroll:
+            self.scroll(self.next_row - self.height)
+
 
     def scroll(self, scroll_pos):
         old_pos = self.scroll_pos

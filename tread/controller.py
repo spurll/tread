@@ -56,24 +56,30 @@ def main(screen, config_file):
     curses.curs_set(False)
 
     # Create screen objects.
-    content, sidebar, menu = init_windows(
-        screen, config.get('buffer_lines', 1000)
-    )
+    content, sidebar, menu, messages = init_windows(screen, config)
 
     # Add key listing to menu.
     menu.write(menu_text(config['keys'], menu.width))
     menu.refresh()
 
+    # Add loading message.
+    def log(message):
+        messages.write(
+            '{:%Y-%m-%d %H:%M}: {}'.format(datetime.now(), message),
+            autoscroll=True
+        )
+        messages.refresh()
 
-    # TODO
-    # Add loading message
-    # Fetch feeds from DB
-    # Fetch current feed items from DB (should trigger web call if needs refresh)
+    # TODO: Auto-expand option (off), otherwise hit SPACE to expand and display
+    # stuff. (Only mark as read when expanded. If auto-expand is on, only mark
+    # as read when CONFIGURABLE VALUE seconds has passed.)
 
-    # Add read/starred state to display
-    # Ensure that things work fine offline if queries fail
-    # Add something that marks things as read (if you spent more than 10 seconds on them?)
+    # TODO: Add ability to do 10j or 10<DOWN_ARROW>, like in vim. Clear it
+    # whenever a non-numeric key is hit.
 
+    # TODO: Add read/starred state to display
+
+    # TODO: Add optional unread count.
 
     # Load feeds from the DB.
     feeds = []
@@ -91,7 +97,7 @@ def main(screen, config_file):
 
     # Initial selections.
     if len(feeds) > 0:
-        feeds[0].refresh(db_session, www_session, config.get('timeout'))
+        feeds[0].refresh(db_session, www_session, config.get('timeout'), log)
 
     selected_feed = 0
     selected_item = 0
@@ -120,9 +126,6 @@ def main(screen, config_file):
         # Print content.
         line = 0
         for i, item in enumerate(current_feed.items):
-            if line >= content.max_lines: break
-            # TODO: This is a terrible kludge. At least warn or something.
-
             content.write(
                 '{:{}}{:%Y-%m-%d %H:%M}'.format(
                     item.title, content.width - 16, item.date
@@ -160,7 +163,8 @@ def main(screen, config_file):
             pass
 
         if key == 'KEY_RESIZE':
-            resize(content, sidebar, menu)
+            resize(content, sidebar, menu, messages)
+            # TODO: Doesn't work anymore?
             menu.write(menu_text(config['keys'], menu.width))
             menu.refresh()
 
@@ -175,24 +179,22 @@ def main(screen, config_file):
                 selected_item = (selected_item - 1) % len(current_feed.items)
 
         elif key == config['keys']['next_feed']:
-            content.clear() # Should be more selective.
+            content.clear()
             sidebar.clear() # Should be more selective.
 
             selected_feed = (selected_feed + 1) % len(feeds)
             selected_item = 0
 
-            # TODO: Time zone stuff.
-            # TODO: Do we need pytz? If so, add to requirements.
             if (feeds[selected_feed].last_refresh is None) or (
                 datetime.utcnow() - feeds[selected_feed].last_refresh >
-                    timedelta(minutes=config.get('refresh_rate', 10))
+                    timedelta(minutes=config.get('refresh', 10))
             ):
                 feeds[selected_feed].refresh(
-                    db_session, www_session, config.get('timeout')
+                    db_session, www_session, config.get('timeout'), log
                 )
 
         elif key == config['keys']['prev_feed']:
-            content.clear() # Should be more selective.
+            content.clear()
             sidebar.clear() # Should be more selective.
 
             selected_feed = (selected_feed - 1) % len(feeds)
@@ -200,10 +202,10 @@ def main(screen, config_file):
 
             if (feeds[selected_feed].last_refresh is None) or (
                 datetime.utcnow() - feeds[selected_feed].last_refresh >
-                    timedelta(minutes=config.get('refresh_rate', 10))
+                    timedelta(minutes=config.get('refresh', 10))
             ):
                 feeds[selected_feed].refresh(
-                    db_session, www_session, config.get('timeout')
+                    db_session, www_session, config.get('timeout'), log
                 )
 
         elif key == config['keys']['scroll_down']:
@@ -230,17 +232,8 @@ def main(screen, config_file):
         elif key == config['keys']['quit']:
             break
 
-
-    # TODO: Write a message function that pops up an overlay window to display
-    # a message and pauses for anykey (or enter?)
-    # Or maybe just have a permenant message area at the bottom.
-
-
-
     # TODO: Looks like some unicode characters aren't working:
     # http://xkcd.com/1647/
-
-
 
     # TODO: Warn that this will probably only work in lynx (or implement both...?)
     # Insert output from image conversion on its own lines before the image tag
@@ -250,14 +243,14 @@ def main(screen, config_file):
     # TODO: Also include html2text as a parser
 
 
-
-def init_windows(screen, buffer_lines):
+def init_windows(screen, config):
     content = Window(
-        screen, *content_dimensions(), max_lines=buffer_lines, title='TREAD'
+        screen, *content_dimensions(),
+        max_lines=config.get('buffer_lines', 1000), title='TREAD'
     )
 
     sidebar = Window(
-        screen, *sidebar_dimensions(), max_lines=200, title='FEEDS'
+        screen, *sidebar_dimensions(), max_lines=100, title='FEEDS'
     )
 
     menu = Window(
@@ -265,7 +258,11 @@ def init_windows(screen, buffer_lines):
         title='KEYS'
     )
 
-    return (content, sidebar, menu)
+    messages = Window(
+        screen, *message_dimensions(), max_lines=10, title='MESSAGES'
+    )
+
+    return (content, sidebar, menu, messages)
 
 
 def parse_content(content, browser, width):
@@ -356,34 +353,51 @@ def menu_text(keys, width):
 
 
 # This is awful.
-def resize(content, sidebar, menu):
+def resize(content, sidebar, menu, messages):
     curses.update_lines_cols()  # Requires Python 3.5.
     sidebar.resize(*sidebar_dimensions())
     menu.resize(*menu_dimensions())
     content.resize(*content_dimensions())
+    messages.resize(*message_dimensions())
+    # TODO: Also re-clear the vertical space between sidebar and contents!
 
 
 def sidebar_width():
-    # Sidebar and menu width should be 50% of screen up to a desired maximum.
+    # Sidebar and menu width should half of screen up to a desired maximum.
     return min(40, curses.COLS // 2)
 
 
 def menu_height():
-    # Menu height should be 50% of screen up to the number of menu items.
-    return min(7 + 2 * Window.border_height, curses.LINES // 2)
+    # Menu height should be a third of screen up to the number of menu items.
+    return min(7 + 2 * Window.border_height, curses.LINES // 3)
+
+
+def message_height():
+    # Message height should be 50% of screen up to four lines of content.
+    return min(4 + 2 * Window.border_height, curses.LINES // 3)
 
 
 def sidebar_dimensions():
-    return (curses.LINES - menu_height(), sidebar_width(), 0, 0)
+    return (
+        curses.LINES - menu_height() - message_height(), sidebar_width(), 0, 0
+    )
 
 
 def menu_dimensions():
-    return (menu_height(), sidebar_width(), curses.LINES - menu_height(), 0)
+    return (
+        menu_height(), sidebar_width(),
+        curses.LINES - menu_height() - message_height(), 0
+    )
+
+
+def message_dimensions():
+    return (message_height(), curses.COLS, curses.LINES - message_height(), 0)
 
 
 def content_dimensions():
     return (
-        curses.LINES, curses.COLS - sidebar_width() - 1, 0, sidebar_width() + 1
+        curses.LINES - message_height(), curses.COLS - sidebar_width() - 1,
+        0, sidebar_width() + 1
     )
 
 

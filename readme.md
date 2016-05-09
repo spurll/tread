@@ -58,6 +58,7 @@ Bugs and Feature Requests
 Feature Requests
 ----------------
 
+* Add auto-expand option (the current behaviour) that defaults to off
 * Add support for ATOM feeds
 * Add ability to (and instructions for) running a cron job to check feeds and
   update the DB regularly even if the main feed reader isn't invoked
@@ -71,6 +72,10 @@ Known Bugs
 
 * Looks like some Unicode characters aren't working right, such as the title
   text in this xkcd comic: http://xkcd.com/1647/
+* May have to change the way the buffer works, in case we have lots of history
+  (more items in the DB than we have buffer lines, for example)
+* Resizing the screen results in losing the contents of the messages window. Oh
+  well.
 
 License Information
 ===================
