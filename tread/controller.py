@@ -70,16 +70,18 @@ def main(screen, config_file):
         )
         messages.refresh()
 
-    # TODO: Auto-expand option (off), otherwise hit SPACE to expand and display
-    # stuff. (Only mark as read when expanded. If auto-expand is on, only mark
-    # as read when CONFIGURABLE VALUE seconds has passed.)
-
     # TODO: Add ability to do 10j or 10<DOWN_ARROW>, like in vim. Clear it
     # whenever a non-numeric key is hit.
 
-    # TODO: Add read/starred state to display
+    # TODO: Looks like some unicode characters aren't working:
+    # http://xkcd.com/1647/
 
-    # TODO: Add optional unread count.
+    # TODO: Warn that this will probably only work in lynx (or implement both...?)
+    # Insert output from image conversion on its own lines before the image tag
+    # (leave it)
+    # use image_to_ascii()
+
+    # TODO: Also include html2text as a parser
 
     # Load feeds from the DB.
     feeds = []
@@ -99,6 +101,7 @@ def main(screen, config_file):
     if len(feeds) > 0:
         feeds[0].refresh(db_session, www_session, config.get('timeout'), log)
 
+    item_open = False
     selected_feed = 0
     selected_item = 0
 
@@ -111,10 +114,17 @@ def main(screen, config_file):
 
         # Print sidebar.
         for i, feed in enumerate(feeds):
+            # Add optional unread count to feed name display.
+            display_name = feed.name
+            if config.get('unread_count'):
+                display_name += ' ({}{})'.format(
+                    feed.unread,
+                    ', *{}'.format(feed.starred) if feed.starred else ''
+                )
+
             sidebar.write(
-                '{:{}}'.format(feed.name, sidebar.width),
-                row_offset=i,
-                attr=curses.A_REVERSE if i == selected_feed else curses.A_BOLD
+                '{:{}}'.format(display_name, sidebar.width), row_offset=i,
+                attr=curses.A_BOLD | curses.A_REVERSE * (i == selected_feed)
             )
 
             if i == selected_feed:
@@ -126,30 +136,39 @@ def main(screen, config_file):
         # Print content.
         line = 0
         for i, item in enumerate(current_feed.items):
+            attributes = (
+                curses.A_REVERSE * (i == selected_item) |
+                curses.A_BOLD * (not item.read)
+            )
+
             content.write(
                 '{:{}}{:%Y-%m-%d %H:%M}'.format(
-                    item.title, content.width - 16, item.date
+                    ('*' if item.starred else '') + item.title,
+                    content.width - 16, item.date
                 ) if len(item.title) + 16 < content.width else '{:{}}'.format(
-                    item.title, content.width
+                    ('*' if item.starred else '') + item.title, content.width
                 ),
-                row_offset=line,
-                attr=curses.A_REVERSE if i == selected_item else curses.A_BOLD
+                row_offset=line, attr=attributes
             )
+
             line += 1
 
             if i == selected_item:
                 current_item = item
-                line += 1
 
-                # Parse the HTML content.
-                parsed_string = parse_content(
-                    item.content, config.get('browser', 'lynx'), content.width
-                )
+                if item_open:
+                    line += 1
 
-                # Print it to the screen.
-                content.write(parsed_string, row_offset=line)
+                    # Parse the HTML content.
+                    parsed_string = parse_content(
+                        item.content, config.get('browser', 'lynx'),
+                        content.width
+                    )
 
-                line += parsed_string.count('\n') + 1
+                    # Print it to the screen.
+                    content.write(parsed_string, row_offset=line)
+
+                    line += parsed_string.count('\n') + 1
 
         # Undo scrolling if content isn't big enough to scroll.
         content.constrain_scroll(line)
@@ -164,26 +183,42 @@ def main(screen, config_file):
 
         if key == 'KEY_RESIZE':
             resize(content, sidebar, menu, messages)
-            # TODO: Doesn't work anymore?
-            menu.write(menu_text(config['keys'], menu.width))
+            menu.write(menu_text(config['keys'], menu.width), row_offset=0)
             menu.refresh()
+
+        elif key == config['keys']['open']:
+            content.clear() # Should be more selective.
+            item_open = not item_open
+
+            if item_open:
+                current_item.read = True
+                db_session.commit()
 
         elif key == config['keys']['next_item']:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item + 1) % len(current_feed.items)
 
+                if item_open:
+                    current_feed.items[selected_item].read = True
+                    db_session.commit()
+
         elif key == config['keys']['prev_item']:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item - 1) % len(current_feed.items)
 
+                if item_open:
+                    current_feed.items[selected_item].read = True
+                    db_session.commit()
+
         elif key == config['keys']['next_feed']:
-            content.clear()
+            content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
 
             selected_feed = (selected_feed + 1) % len(feeds)
             selected_item = 0
+            item_open = False
 
             if (feeds[selected_feed].last_refresh is None) or (
                 datetime.utcnow() - feeds[selected_feed].last_refresh >
@@ -194,11 +229,12 @@ def main(screen, config_file):
                 )
 
         elif key == config['keys']['prev_feed']:
-            content.clear()
+            content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
 
             selected_feed = (selected_feed - 1) % len(feeds)
             selected_item = 0
+            item_open = False
 
             if (feeds[selected_feed].last_refresh is None) or (
                 datetime.utcnow() - feeds[selected_feed].last_refresh >
@@ -220,27 +256,16 @@ def main(screen, config_file):
             if current_item is not None:
                 open_in_browser(current_item.url)
 
-        elif key == config['keys']['mark_read']:
-            pass    # TODO
+        elif key == config['keys']['toggle_read']:
+            current_item.read = not current_item.read
+            db_session.commit()
 
-        elif key == config['keys']['mark_unread']:
-            pass    # TODO
-
-        elif key == config['keys']['star']:
-            pass    # TODO
+        elif key == config['keys']['toggle_star']:
+            current_item.starred = not current_item.starred
+            db_session.commit()
 
         elif key == config['keys']['quit']:
             break
-
-    # TODO: Looks like some unicode characters aren't working:
-    # http://xkcd.com/1647/
-
-    # TODO: Warn that this will probably only work in lynx (or implement both...?)
-    # Insert output from image conversion on its own lines before the image tag
-    # (leave it)
-    # use image_to_ascii()
-
-    # TODO: Also include html2text as a parser
 
 
 def init_windows(screen, config):
@@ -254,7 +279,7 @@ def init_windows(screen, config):
     )
 
     menu = Window(
-        screen, *menu_dimensions(), max_lines=7 + 2 * Window.border_height,
+        screen, *menu_dimensions(), max_lines=8 + 2 * Window.border_height,
         title='KEYS'
     )
 
@@ -296,15 +321,15 @@ def open_in_browser(url):
 
 def configure_keys(existing):
     default = {
+        'open': ' ',
         'prev_item': 'K',
         'next_item': 'J',
         'prev_feed': 'H',
         'next_feed': 'L',
         'scroll_up': 'KEY_UP',
         'scroll_down': 'KEY_DOWN',
-        'mark_read': 'R',
-        'mark_unread': 'U',
-        'star': 'S',
+        'toggle_read': 'R',
+        'toggle_star': 'S',
         'open_in_browser': 'O',
         'quit': 'Q'
     }
@@ -317,36 +342,42 @@ def configure_keys(existing):
 
 
 def menu_text(keys, width):
-    key_width = 17
+    key_width = 16
     value_width = max(0, width - key_width)
     menu_format = '{:<{}}{:>{}}'
 
+    # Make the display names a little nicer.
+    disp = {
+        k: v.replace('KEY_', '') if v != ' ' else 'SPACE'
+        for k, v in keys.items()
+    }
+
     menu = [
         menu_format.format(
+            'Open/Close Item:', key_width, disp['open'], value_width
+        ),
+        menu_format.format(
             'Prev/Next Item:', key_width,
-            keys['prev_item'] + '/' + keys['next_item'], value_width
+            disp['prev_item'] + '/' + disp['next_item'], value_width
         ),
         menu_format.format(
             'Prev/Next Feed:', key_width,
-            keys['prev_feed'] + '/' + keys['next_feed'], value_width
+            disp['prev_feed'] + '/' + disp['next_feed'], value_width
         ),
         menu_format.format(
             'Scroll Up/Down:', key_width,
-            keys['scroll_up'] + '/' + keys['scroll_down'], value_width
+            disp['scroll_up'] + '/' + disp['scroll_down'], value_width
         ),
         menu_format.format(
-            'Mark Read/Unread:', key_width,
-            keys['mark_read'] + '/' + keys['mark_unread'], value_width
+            'Toggle Read:', key_width, disp['toggle_read'], value_width
         ),
         menu_format.format(
-            'Toggle Star:', key_width, keys['star'], value_width
+            'Toggle Star:', key_width, disp['toggle_star'], value_width
         ),
         menu_format.format(
-            'Open in Browser:', key_width, keys['open_in_browser'], value_width
+            'Open in Browser:', key_width, disp['open_in_browser'], value_width
         ),
-        menu_format.format(
-            'Quit', key_width, keys['quit'], value_width
-        ),
+        menu_format.format('Quit', key_width, disp['quit'], value_width),
     ]
 
     return ''.join(menu)
@@ -355,11 +386,11 @@ def menu_text(keys, width):
 # This is awful.
 def resize(content, sidebar, menu, messages):
     curses.update_lines_cols()  # Requires Python 3.5.
+
     sidebar.resize(*sidebar_dimensions())
     menu.resize(*menu_dimensions())
     content.resize(*content_dimensions())
     messages.resize(*message_dimensions())
-    # TODO: Also re-clear the vertical space between sidebar and contents!
 
 
 def sidebar_width():
@@ -369,7 +400,7 @@ def sidebar_width():
 
 def menu_height():
     # Menu height should be a third of screen up to the number of menu items.
-    return min(7 + 2 * Window.border_height, curses.LINES // 3)
+    return min(8 + 2 * Window.border_height, curses.LINES // 3)
 
 
 def message_height():

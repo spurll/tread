@@ -33,6 +33,14 @@ class Feed(Base):
         self.description = ''
         self.last_refresh = None
 
+    @property
+    def unread(self):
+        return len(list(filter(lambda item: not item.read, self.items)))
+
+    @property
+    def starred(self):
+        return len(list(filter(lambda item: item.starred, self.items)))
+
     # Update object from web and write back to DB.
     def refresh(self, db_session, www_session, timeout, log):
         log('Refreshing {}...'.format(self.name))
@@ -179,12 +187,11 @@ class Window:
             self.pad.resize(self.max_lines, self.width)
             self.pad.addstr(row_offset, col_offset, string, attr)
 
-        self.next_row = row_offset + 1
-        # TODO: Shouldn't be +1: should figure out if it's a multiline thing.
+        lines = (col_offset + len(string)) // (self.width + 1) + 1
+        self.next_row = row_offset + lines
 
         if autoscroll:
             self.scroll(self.next_row - self.height)
-
 
     def scroll(self, scroll_pos):
         old_pos = self.scroll_pos

@@ -58,7 +58,8 @@ Bugs and Feature Requests
 Feature Requests
 ----------------
 
-* Add auto-expand option (the current behaviour) that defaults to off
+* Add view toggels to display only unread or only starred items
+* Add ability to scroll feed list
 * Add support for ATOM feeds
 * Add ability to (and instructions for) running a cron job to check feeds and
   update the DB regularly even if the main feed reader isn't invoked

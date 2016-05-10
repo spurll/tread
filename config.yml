@@ -19,15 +19,15 @@ feeds:
     url: http://boingboing.net/feed
 
 keys:
+  open: ' '
   prev_item: K
   next_item: J
   prev_feed: H
   next_feed: L
   scroll_up: KEY_UP
   scroll_down: KEY_DOWN
-  mark_read: R
-  mark_unread: U
-  star: S
+  toggle_read: R
+  toggle_star: S
   open_in_browser: O
   quit: Q
 
@@ -38,3 +38,4 @@ timeout: 10
 refresh: 10
 ascii_images: true
 buffer_lines: 1000
+unread_count: true
