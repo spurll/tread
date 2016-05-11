@@ -98,7 +98,12 @@ def main(screen, config_file):
         feeds.append(row)
 
     # Initial selections.
-    if len(feeds) > 0:
+    if (len(feeds) > 0) and (
+        (feeds[0].last_refresh is None) or (
+            datetime.utcnow() - feeds[0].last_refresh >
+            timedelta(minutes=config.get('refresh', 10))
+        )
+    ):
         feeds[0].refresh(db_session, www_session, config.get('timeout'), log)
 
     item_open = False
@@ -111,6 +116,7 @@ def main(screen, config_file):
 
     while True:
         current_item = None
+        current_feed = None
 
         # Print sidebar.
         for i, feed in enumerate(feeds):
@@ -134,44 +140,52 @@ def main(screen, config_file):
         sidebar.refresh()
 
         # Print content.
-        line = 0
-        for i, item in enumerate(current_feed.items):
-            attributes = (
-                curses.A_REVERSE * (i == selected_item) |
-                curses.A_BOLD * (not item.read)
-            )
+        if current_feed:
+            for i, item in enumerate(current_feed.items):
+                attributes = (
+                    curses.A_REVERSE * (i == selected_item) |
+                    curses.A_BOLD * (not item.read)
+                )
 
-            content.write(
-                '{:{}}{:%Y-%m-%d %H:%M}'.format(
-                    ('*' if item.starred else '') + item.title,
-                    content.width - 16, item.date
-                ) if len(item.title) + 16 < content.width else '{:{}}'.format(
-                    ('*' if item.starred else '') + item.title, content.width
-                ),
-                row_offset=line, attr=attributes
-            )
-
-            line += 1
-
-            if i == selected_item:
-                current_item = item
-
-                if item_open:
-                    line += 1
-
-                    # Parse the HTML content.
-                    parsed_string = parse_content(
-                        item.content, config.get('browser', 'lynx'),
-                        content.width
+                if len(item.title) + 16 < content.width:
+                    # There is space for a date.
+                    content.write(
+                        '{:{}}{:%Y-%m-%d %H:%M}'.format(
+                            ('*' if item.starred else '') + item.title,
+                            content.width - 16, item.date
+                        ),
+                        row_offset=0 if i == 0 else None, attr=attributes
+                    )
+                else:
+                    # No space to include the date.
+                    content.write(
+                        '{:{}}'.format(
+                            ('*' if item.starred else '') + item.title,
+                            content.width
+                        ),
+                        row_offset=0 if i == 0 else None, attr=attributes
                     )
 
-                    # Print it to the screen.
-                    content.write(parsed_string, row_offset=line)
+                if i == selected_item:
+                    current_item = item
 
-                    line += parsed_string.count('\n') + 1
+                    if item_open:
+                        # Parse the HTML content.
+                        parsed_string = parse_content(
+                            item.content, config.get('browser', 'lynx'),
+                            content.width, config.get('ascii_images'), log
+                        )
+
+                        # Print it to the screen.
+                        content.write('\n{}\n'.format(parsed_string))
+        else:
+            log(
+                'No feeds to display. Instructions for adding feeds are '
+                'available in the readme.'
+            )
 
         # Undo scrolling if content isn't big enough to scroll.
-        content.constrain_scroll(line)
+        content.constrain_scroll(content.next_row)
         content.refresh()
 
         # Block, waiting for input.
@@ -186,7 +200,7 @@ def main(screen, config_file):
             menu.write(menu_text(config['keys'], menu.width), row_offset=0)
             menu.refresh()
 
-        elif key == config['keys']['open']:
+        elif key == config['keys']['open'] and current_item:
             content.clear() # Should be more selective.
             item_open = not item_open
 
@@ -194,7 +208,7 @@ def main(screen, config_file):
                 current_item.read = True
                 db_session.commit()
 
-        elif key == config['keys']['next_item']:
+        elif key == config['keys']['next_item'] and current_feed:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item + 1) % len(current_feed.items)
@@ -203,7 +217,7 @@ def main(screen, config_file):
                     current_feed.items[selected_item].read = True
                     db_session.commit()
 
-        elif key == config['keys']['prev_item']:
+        elif key == config['keys']['prev_item'] and current_feed:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item - 1) % len(current_feed.items)
@@ -212,7 +226,7 @@ def main(screen, config_file):
                     current_feed.items[selected_item].read = True
                     db_session.commit()
 
-        elif key == config['keys']['next_feed']:
+        elif key == config['keys']['next_feed'] and current_feed:
             content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
 
@@ -228,7 +242,7 @@ def main(screen, config_file):
                     db_session, www_session, config.get('timeout'), log
                 )
 
-        elif key == config['keys']['prev_feed']:
+        elif key == config['keys']['prev_feed'] and current_feed:
             content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
 
@@ -252,15 +266,14 @@ def main(screen, config_file):
             content.clear() # Should be more selective.
             content.scroll_up()
 
-        elif key == config['keys']['open_in_browser']:
-            if current_item is not None:
-                open_in_browser(current_item.url)
+        elif key == config['keys']['open_in_browser'] and current_item:
+            open_in_browser(current_item.url)
 
-        elif key == config['keys']['toggle_read']:
+        elif key == config['keys']['toggle_read'] and current_item:
             current_item.read = not current_item.read
             db_session.commit()
 
-        elif key == config['keys']['toggle_star']:
+        elif key == config['keys']['toggle_star'] and current_item:
             current_item.starred = not current_item.starred
             db_session.commit()
 
@@ -290,7 +303,7 @@ def init_windows(screen, config):
     return (content, sidebar, menu, messages)
 
 
-def parse_content(content, browser, width):
+def parse_content(content, browser, width, images, log):
     if browser == 'lynx':
         command = [
             'lynx', '-stdin', '-dump', '-width', str(width), '-image_links'
@@ -300,7 +313,8 @@ def parse_content(content, browser, width):
         command = ['w3m', '-T', 'text/html', '-dump', '-cols', str(width)]
         encoding = 'utf-8'
     else:
-        Exception('Unsuported browser: {}'.format(browser))
+        log('Unsuported browser: {}'.format(browser))
+        return content
 
     output = subprocess.check_output(
         command,
@@ -308,6 +322,13 @@ def parse_content(content, browser, width):
         stderr=subprocess.STDOUT
     )
     output = output.decode(encoding, 'xmlcharrefreplace')
+
+    if images:
+        if browser == 'lynx':
+            # TODO
+            pass
+        else:
+            log('ASCII images are currently only supported with lynx.')
 
     return output
 

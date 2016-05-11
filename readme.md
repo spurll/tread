@@ -61,11 +61,13 @@ Feature Requests
 * Add view toggels to display only unread or only starred items
 * Add ability to scroll feed list
 * Add support for ATOM feeds
+* Add colour support
 * Add ability to (and instructions for) running a cron job to check feeds and
   update the DB regularly even if the main feed reader isn't invoked
 * If no terminal web browser/parser is installed, just display the raw HTML
 * Maybe there's a better way to parse the HTML than lynx/w3m
 * Should log errors (and other messages) to a log file
+* Configurable DB pruning (only keep X days to prevent DB from ballooning)
 * [bcj](https://github.com/bcj) recommends changing the name to `cuRSSes`
 
 Known Bugs
@@ -73,10 +75,11 @@ Known Bugs
 
 * Looks like some Unicode characters aren't working right, such as the title
   text in this xkcd comic: http://xkcd.com/1647/
-* May have to change the way the buffer works, in case we have lots of history
-  (more items in the DB than we have buffer lines, for example)
-* Resizing the screen results in losing the contents of the messages window. Oh
-  well.
+* Resizing the screen results in losing the contents of the messages window (oh
+  well)
+* Currently ignores the `<sy:updatePeriod>`, `<sy:updateFrequency>`, and
+  `<sy:updateBase>` tags in favour of re-fetching each feed at the interval
+  specified in the config file
 
 License Information
 ===================

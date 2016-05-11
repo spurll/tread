@@ -174,7 +174,7 @@ class Window:
 
     def write(
         self, string, row_offset=None, col_offset=0, attr=curses.A_NORMAL,
-        autoscroll=False
+        autoscroll=False, log=None
     ):
         if row_offset is None:
             row_offset = self.next_row
@@ -183,12 +183,12 @@ class Window:
             self.pad.addstr(row_offset, col_offset, string, attr)
         except curses.error:
             # Lazy way to prevent writing too many buffer lines. Ugh.
-            self.max_lines += 10
+            self.max_lines += 100
             self.pad.resize(self.max_lines, self.width)
             self.pad.addstr(row_offset, col_offset, string, attr)
 
-        lines = (col_offset + len(string)) // (self.width + 1) + 1
-        self.next_row = row_offset + lines
+        cursor = self.pad.getyx()
+        self.next_row = cursor[0] if cursor[1] == 0 else cursor[0] + 1
 
         if autoscroll:
             self.scroll(self.next_row - self.height)
