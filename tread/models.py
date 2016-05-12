@@ -132,7 +132,6 @@ class Window:
         self.full_height = height if height is not None else curses.LINES
         self.full_width = width if width is not None else curses.COLS
         self.max_lines = max_lines
-        # TODO: We may need to figure out how to scroll the sidebar.
 
         # Position information.
         self.row_offset = row_offset
@@ -150,6 +149,10 @@ class Window:
         if self.col_offset < 0:
             self.col_offset += curses.COLS
 
+        # Border and title setup.
+        self.border = border
+        self.title = title
+
         # Curses setup.
         self.screen = screen
         self.window = curses.newwin(
@@ -157,20 +160,18 @@ class Window:
         )
         self.pad = curses.newpad(self.max_lines, self.width)
 
-        # Border and title setup.
-        self.border = border
-        self.title = title
-
         # Refreshing border also refreshes the title.
         self.refresh_border()
 
     @property
     def height(self):
-        return self.full_height - 2 * Window.border_height
+        border = Window.border_height if self.border else 0
+        return self.full_height - 2 * border
 
     @property
     def width(self):
-        return self.full_width - 2 * Window.border_width
+        border = Window.border_width if self.border else 0
+        return self.full_width - 2 * border
 
     def write(
         self, string, row_offset=None, col_offset=0, attr=curses.A_NORMAL,
@@ -207,9 +208,9 @@ class Window:
     def scroll_up(self, n=1):
         self.scroll(self.scroll_pos - n)
 
-    def constrain_scroll(self, last_line=None):
+    def constrain_scroll(self, first_line=0, last_line=None):
         # Prevent negative scroll.
-        self.scroll_pos = max(self.scroll_pos, 0)
+        self.scroll_pos = max(self.scroll_pos, first_line)
 
         # Prevent scrolling past the content.
         if last_line is not None:
@@ -219,13 +220,16 @@ class Window:
         self.pad.clear()
 
     def refresh(self):
+        border_height = Window.border_height if self.border else 0
+        border_width = Window.border_width if self.border else 0
+
         try:
             self.pad.refresh(
                 self.scroll_pos, 0,
-                Window.border_height + self.row_offset,
-                Window.border_width + self.col_offset,
-                Window.border_height + self.row_offset + self.height - 1,
-                Window.border_width + self.col_offset + self.width - 1
+                border_height + self.row_offset,
+                border_width + self.col_offset,
+                border_height + self.row_offset + self.height - 1,
+                border_width + self.col_offset + self.width - 1
             )
         except:
             # Curses is garbage.
@@ -241,7 +245,7 @@ class Window:
         self.window.refresh()
 
     def centre(self, text):
-        return (self.full_width - len(text)) // 2
+        return max((self.full_width - len(text)) // 2, 0)
 
     def resize(
         self, new_height, new_width, new_row_offset=None, new_col_offset=None

@@ -50,24 +50,29 @@ Requirements
 * requests
 * beautifulsoup4
 * imgii
-* lynx (or w3m)
+* lynx, w3m, or html2text
 
 Bugs and Feature Requests
 =========================
 
+1.0 Checklist
+-------------
+
+* Image support (`lynx` only)
+* Python-only parser (`html2text`)
+* Offline process to update feeds (with `setup.py` endpoint!)
+* Readme update (fix all TODOs)
+
 Feature Requests
 ----------------
 
-* Add view toggels to display only unread or only starred items
-* Add ability to scroll feed list
-* Add support for ATOM feeds
-* Add colour support
-* Add ability to (and instructions for) running a cron job to check feeds and
-  update the DB regularly even if the main feed reader isn't invoked
-* If no terminal web browser/parser is installed, just display the raw HTML
-* Maybe there's a better way to parse the HTML than lynx/w3m
-* Should log errors (and other messages) to a log file
+* Support for ATOM feeds
+* View toggels to display only unread or only starred items
+* Ability to scroll feed list
 * Configurable DB pruning (only keep X days to prevent DB from ballooning)
+* Colour support
+* Ability to (and instructions for) running a cron job to check feeds and
+  update the DB regularly even if the main feed reader isn't invoked
 * [bcj](https://github.com/bcj) recommends changing the name to `cuRSSes`
 
 Known Bugs

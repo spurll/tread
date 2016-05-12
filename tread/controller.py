@@ -14,6 +14,15 @@ from sqlalchemy.orm import sessionmaker
 from models import Base, Window, Feed, Item
 
 
+LOGO = [
+    r" _____                 _             ",
+    r"|_   _|_ ___  __ _  __| |  by        ",
+    r"  | | `_| _ \/ _` |/ _` |  Gem Newman",
+    r"  | | ||  __/ (_| | (_| |            ",
+    r"  |_|_| \___\\__'_|\__'_|  spurll.com"
+]
+
+
 def console_main():
     parser = ArgumentParser(description='A simple terminal feed reader.')
     parser.add_argument(
@@ -56,7 +65,10 @@ def main(screen, config_file):
     curses.curs_set(False)
 
     # Create screen objects.
-    content, sidebar, menu, messages = init_windows(screen, config)
+    content, logo, sidebar, menu, messages = init_windows(screen, config)
+
+    # Write logo to screen.
+    draw_logo(logo)
 
     # Add key listing to menu.
     menu.write(menu_text(config['keys'], menu.width))
@@ -72,9 +84,6 @@ def main(screen, config_file):
 
     # TODO: Add ability to do 10j or 10<DOWN_ARROW>, like in vim. Clear it
     # whenever a non-numeric key is hit.
-
-    # TODO: Looks like some unicode characters aren't working:
-    # http://xkcd.com/1647/
 
     # TODO: Warn that this will probably only work in lynx (or implement both...?)
     # Insert output from image conversion on its own lines before the image tag
@@ -169,6 +178,14 @@ def main(screen, config_file):
                 if i == selected_item:
                     current_item = item
 
+                    # Autoscroll if selected content is off the screen.
+                    content.constrain_scroll(
+                        first_line=max(content.next_row - content.height, 0),
+                        last_line=content.height + content.next_row - 1
+                    )
+                    # Not perfect, because when the items are open sometimes
+                    # only the title will be visible. Oh well.
+
                     if item_open:
                         # Parse the HTML content.
                         parsed_string = parse_content(
@@ -178,6 +195,7 @@ def main(screen, config_file):
 
                         # Print it to the screen.
                         content.write('\n{}\n'.format(parsed_string))
+
         else:
             log(
                 'No feeds to display. Instructions for adding feeds are '
@@ -185,7 +203,7 @@ def main(screen, config_file):
             )
 
         # Undo scrolling if content isn't big enough to scroll.
-        content.constrain_scroll(content.next_row)
+        content.constrain_scroll(last_line=content.next_row)
         content.refresh()
 
         # Block, waiting for input.
@@ -196,7 +214,8 @@ def main(screen, config_file):
             pass
 
         if key == 'KEY_RESIZE':
-            resize(content, sidebar, menu, messages)
+            resize(content, logo, sidebar, menu, messages)
+            draw_logo(logo)
             menu.write(menu_text(config['keys'], menu.width), row_offset=0)
             menu.refresh()
 
@@ -284,23 +303,24 @@ def main(screen, config_file):
 def init_windows(screen, config):
     content = Window(
         screen, *content_dimensions(),
-        max_lines=config.get('buffer_lines', 1000), title='TREAD'
+        max_lines=config.get('buffer_lines', 1000)
+    )
+
+    logo = Window(
+        screen, *logo_dimensions(), max_lines=len(LOGO), border=False
     )
 
     sidebar = Window(
         screen, *sidebar_dimensions(), max_lines=100, title='FEEDS'
     )
 
-    menu = Window(
-        screen, *menu_dimensions(), max_lines=8 + 2 * Window.border_height,
-        title='KEYS'
-    )
+    menu = Window(screen, *menu_dimensions(), max_lines=8, title='KEYS')
 
     messages = Window(
         screen, *message_dimensions(), max_lines=10, title='MESSAGES'
     )
 
-    return (content, sidebar, menu, messages)
+    return (content, logo, sidebar, menu, messages)
 
 
 def parse_content(content, browser, width, images, log):
@@ -405,9 +425,10 @@ def menu_text(keys, width):
 
 
 # This is awful.
-def resize(content, sidebar, menu, messages):
+def resize(content, logo, sidebar, menu, messages):
     curses.update_lines_cols()  # Requires Python 3.5.
 
+    logo.resize(*logo_dimensions())
     sidebar.resize(*sidebar_dimensions())
     menu.resize(*menu_dimensions())
     content.resize(*content_dimensions())
@@ -419,19 +440,29 @@ def sidebar_width():
     return min(40, curses.COLS // 2)
 
 
+def logo_height():
+    # Logo height should be a quarter of screen up to the number of lines.
+    return min(len(LOGO) + 1, curses.LINES // 4)
+
+
 def menu_height():
-    # Menu height should be a third of screen up to the number of menu items.
-    return min(8 + 2 * Window.border_height, curses.LINES // 3)
+    # Menu height should be a quarter of screen up to the number of menu items.
+    return min(8 + 2 * Window.border_height, curses.LINES // 4)
 
 
 def message_height():
-    # Message height should be 50% of screen up to four lines of content.
-    return min(4 + 2 * Window.border_height, curses.LINES // 3)
+    # Message height should be a quarter of screen up to four lines of content.
+    return min(4 + 2 * Window.border_height, curses.LINES // 4)
+
+
+def logo_dimensions():
+    return (logo_height(), sidebar_width(), 0, 0)
 
 
 def sidebar_dimensions():
     return (
-        curses.LINES - menu_height() - message_height(), sidebar_width(), 0, 0
+        curses.LINES - logo_height() - menu_height() - message_height(),
+        sidebar_width(), logo_height(), 0
     )
 
 
@@ -451,6 +482,16 @@ def content_dimensions():
         curses.LINES - message_height(), curses.COLS - sidebar_width() - 1,
         0, sidebar_width() + 1
     )
+
+
+def draw_logo(window):
+    for i, line in enumerate(LOGO):
+        window.write(
+            line, row_offset=i, col_offset=window.centre(line),
+            attr=curses.A_BOLD
+        )
+
+    window.refresh()
 
 
 if __name__ == '__main__':

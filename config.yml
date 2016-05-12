@@ -1,4 +1,6 @@
 feeds:
+  - name: Bad Astronomy
+    url: http://www.slate.com/blogs/bad_astronomy.fulltext.all.rss
   - name: Whatever
     url: http://whatever.scalzi.com/feed
   - name: Pharyngula
