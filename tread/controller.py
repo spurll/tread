@@ -4,7 +4,7 @@
 # Attribution-ShareAlike 4.0 International License.                    
 
 
-import subprocess, requests, yaml, curses, textwrap, os, webbrowser
+import subprocess, requests, yaml, curses, textwrap, os, shutil, webbrowser
 from argparse import ArgumentParser
 from functools import partial
 from datetime import datetime, timedelta
@@ -36,9 +36,24 @@ def console_main():
 
 
 def main(screen, config_file):
+    # Find configuration file.
+    missing_config = not os.path.isfile(config_file)
+
+    if missing_config:
+        sample_config = os.path.realpath(
+            os.path.join(os.path.dirname(__file__), '..', 'sample_config.yml')
+        )
+        missing_sample = not os.path.isfile(sample_config)
+
+        if not missing_sample:
+            shutil.copyfile(sample_config, config_file)
+
     # Load configuration.
-    with open(config_file) as f:
-        config = yaml.load(f)
+    try:
+        with open(config_file) as f:
+            config = yaml.load(f)
+    except:
+        config = {'feeds': []}
 
     # Ensure config['keys'] exists and make all keys uppercase.
     config['keys'] = configure_keys(config.get('keys', dict()))
@@ -83,8 +98,17 @@ def main(screen, config_file):
         )
         messages.refresh()
 
+    if missing_config and missing_sample:
+        log('No configuration file found at {}.'.format(config_file))
+    elif missing_config:
+        log(
+            'No configuration file found at {}. A sample configuration file '
+            'has been provided.'.format(config_file)
+        )
+
     # TODO: Add ability to do 10j or 10<DOWN_ARROW>, like in vim. Clear it
     # whenever a non-numeric key is hit.
+    # TODO: Add g/gg (or something) for top/bottom of feed items
 
     # TODO: Warn that this will probably only work in lynx (or implement both...?)
     # Insert output from image conversion on its own lines before the image tag
@@ -191,17 +215,17 @@ def main(screen, config_file):
                     if item_open:
                         # Parse the HTML content.
                         parsed_string = parse_content(
-                            item.content, config.get('browser', 'lynx'),
+                            item.content, config.get('parser', 'html2text'),
                             content.width, config.get('ascii_images'), log
                         )
 
                         # Print it to the screen.
-                        content.write('\n{}\n'.format(parsed_string))
+                        content.write('\n{}'.format(parsed_string))
 
         else:
             log(
                 'No feeds to display. Instructions for adding feeds are '
-                'available in the readme.'
+                'available in the readme document.'
             )
 
         # Undo scrolling if content isn't big enough to scroll.
@@ -228,6 +252,9 @@ def main(screen, config_file):
             if item_open:
                 current_item.read = True
                 db_session.commit()
+            else:
+                # When closed, title might be off the screen now.
+                autoscroll_to_item = True
 
         elif key == config['keys']['next_item'] and current_feed:
             if len(current_feed.items) > 0:
@@ -330,11 +357,15 @@ def init_windows(screen, config):
 def parse_content(content, browser, width, images, log):
     if browser == 'lynx':
         output = subprocess.check_output(
-            ['lynx', '-stdin', '-dump', '-width', str(width), '-image_links'],
+            [
+                'lynx',
+                '-stdin', '-dump', '-width', str(width + 2), '-image_links'
+            ],
             input=content.encode('iso-8859-1', 'xmlcharrefreplace'),
             stderr=subprocess.STDOUT
         )
-        output = output.decode(encoding, 'xmlcharrefreplace')
+        output = output.decode('iso-8859-1', 'xmlcharrefreplace')
+        output += '\n'
 
     elif browser == 'w3m':
         output = subprocess.check_output(
@@ -342,11 +373,11 @@ def parse_content(content, browser, width, images, log):
             input=content.encode('utf-8', 'xmlcharrefreplace'),
             stderr=subprocess.STDOUT
         )
-        output = output.decode(encoding, 'xmlcharrefreplace')
+        output = output.decode('utf-8', 'xmlcharrefreplace')
 
     elif browser == 'html2text':
         handler = HTML2Text()
-        handler.body_width = width
+        handler.body_width = width - 1
         output = handler.handle(content)
 
     else:

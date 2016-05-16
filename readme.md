@@ -1,7 +1,7 @@
 tread
 =====
 
-A very simple terminal RSS feed reader written in Python 3.
+A basic terminal RSS feed reader written in Python 3.
 
 Usage
 =====
@@ -12,31 +12,54 @@ Installation
 Install via pip with `pip3 install tread` or download the source and run
 `setup.py install`.
 
-Configuration
--------------
-
-TODO: Add example config.yml and/or configuration script
-
-TODO: Test for broken feeds and other invalid config
-
-Add the desired feeds to `~/.tread.yml` and ensure that the requirements are
-satisfied (currently, either `lynx` or `w3m` is required to do basic parsing of
-HTML content).
-
 Basic Usage
 -----------
 
-Once installed, run `tread`. If your configuration file isn't located at
-`~/.tread.yml`, you may specify a file at runtime: `tread config.yml`.
+Once installed, run `tread`.
 
-Supported HTML Parsers
-----------------------
+Configuration
+-------------
 
-html2text
+By default, `tread` assumes that your configuration file is located at
+`~/.tread.yml`. If it isn't, you may specify a configuration file at runtime:
+`tread config.yml`.
 
-On posix systems:
-lynx
-w3m (ascii images not supported)
+If the configuration file can't found at runtime, `tread` will copy
+`sample_config.yml` into the specified (or default) location. You may then edit
+this file to add feeds or change optional parameters.
+
+### Subscribing to a Feed
+
+While some optional parameters can be configured (who doesn't love tweaking HTTP
+request timeout values?), most users will primarily use the configuration
+file to specify the feeds to which they want to subscribe. For each feed,
+`tread` requires a `name` and a `url`, in the following format:
+
+```yaml
+feeds:
+  - name: Bad Astronomy
+    url: http://www.slate.com/blogs/bad_astronomy.fulltext.all.rss
+  - name: Boing Boing
+    url: http://boingboing.net/feed
+  - name: Whatever
+    url: http://whatever.scalzi.com/feed
+  - name: xkcd
+    url: http://xkcd.com/rss.xml
+```
+
+### Supported Parsers
+
+Several parsers are available to convert the HTML content found in RSS feeds to
+text easily displayed in a terminal. The parser to use is specified using the
+configuration file's `parser` field.
+
+Acceptable values for the `parser` field are: `html2text` (default), `lynx`, and
+`w3m`.
+
+If you're running `tread` in a Windows environment (or you'd prefer to avoid
+external calls), you probably want to use `html2text`, which will convert the
+content to markdown. On \*nix systems, `lynx` and `w3m` are also available (if
+you have them installed), although `w3m` doesn't support ASCII images.
 
 Updating Feeds
 --------------
@@ -48,6 +71,7 @@ subscribe to a site that posts a lot of content (or has a short RSS history) and
 you don't check your feed reader very day.
 
 TODO: Add instructions for updating feeds
+TODO: Add endpoint for this
 
 Requirements
 ------------
@@ -68,9 +92,9 @@ Bugs and Feature Requests
 -------------
 
 * Image support (`lynx` only, or will `html2text` work?)
-* Python-only parser (`html2text`)
 * Offline process to update feeds (with `setup.py` endpoint!)
 * Readme update (fix all TODOs)
+* Test installation procedures with blank config files
 
 Feature Requests
 ----------------
