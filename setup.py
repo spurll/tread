@@ -16,7 +16,7 @@ setup(
     license='CC BY-SA 4.0',
     install_requires=[
         'requests', 'beautifulsoup4', 'pyyaml', 'imgii', 'python-dateutil',
-        'sqlalchemy'
+        'sqlalchemy', 'html2text'
     ],
     entry_points = {
         'console_scripts': ('tread = tread.controller:console_main')

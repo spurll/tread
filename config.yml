@@ -3,8 +3,14 @@ feeds:
     url: http://www.slate.com/blogs/bad_astronomy.fulltext.all.rss
   - name: Whatever
     url: http://whatever.scalzi.com/feed
+  - name: Justine Larbalestier
+    url: http://justinelarbalestier.com/blog/feed/
+  - name: Mary Robinette Kowal
+    url: http://maryrobinettekowal.com/category/journal/feed
   - name: Pharyngula
     url: http://freethoughtblogs.com/pharyngula/feed/
+  - name: Neurologica
+    url: http://theness.com/neurologicablog/index.php/feed/
   - name: Greta Christina's Blog
     url: http://the-orbit.net/greta/feed/
   - name: Lousy Canuck
@@ -34,7 +40,7 @@ keys:
   quit: Q
 
 database: ~/.tread.db
-browser: lynx
+browser: html2text
 retries: 10
 timeout: 10
 refresh: 10

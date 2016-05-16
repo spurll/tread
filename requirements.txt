@@ -3,3 +3,5 @@ requests
 pyyaml
 imgii
 python-dateutil
+html2text
+sqlalchemy

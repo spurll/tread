@@ -4,10 +4,11 @@
 # Attribution-ShareAlike 4.0 International License.                    
 
 
-import subprocess, requests, yaml, curses, textwrap, sys, os
+import subprocess, requests, yaml, curses, textwrap, os, webbrowser
 from argparse import ArgumentParser
 from functools import partial
 from datetime import datetime, timedelta
+from html2text import HTML2Text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -90,8 +91,6 @@ def main(screen, config_file):
     # (leave it)
     # use image_to_ascii()
 
-    # TODO: Also include html2text as a parser
-
     # Load feeds from the DB.
     feeds = []
     for feed in config['feeds']:
@@ -116,6 +115,7 @@ def main(screen, config_file):
         feeds[0].refresh(db_session, www_session, config.get('timeout'), log)
 
     item_open = False
+    autoscroll_to_item = False
     selected_feed = 0
     selected_item = 0
 
@@ -178,13 +178,15 @@ def main(screen, config_file):
                 if i == selected_item:
                     current_item = item
 
-                    # Autoscroll if selected content is off the screen.
-                    content.constrain_scroll(
-                        first_line=max(content.next_row - content.height, 0),
-                        last_line=content.height + content.next_row - 1
-                    )
-                    # Not perfect, because when the items are open sometimes
-                    # only the title will be visible. Oh well.
+                    # Autoscroll if newly-selected content is off the screen.
+                    if autoscroll_to_item:
+                        content.constrain_scroll(
+                            first_line=max(content.next_row-content.height, 0),
+                            last_line=content.height + content.next_row - 1
+                        )
+                        # Not perfect, because when the items are open
+                        # sometimes only the title will be visible. Oh well.
+                        autoscroll_to_item = False
 
                     if item_open:
                         # Parse the HTML content.
@@ -231,6 +233,7 @@ def main(screen, config_file):
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item + 1) % len(current_feed.items)
+                autoscroll_to_item = True
 
                 if item_open:
                     current_feed.items[selected_item].read = True
@@ -240,6 +243,7 @@ def main(screen, config_file):
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
                 selected_item = (selected_item - 1) % len(current_feed.items)
+                autoscroll_to_item = True
 
                 if item_open:
                     current_feed.items[selected_item].read = True
@@ -286,7 +290,7 @@ def main(screen, config_file):
             content.scroll_up()
 
         elif key == config['keys']['open_in_browser'] and current_item:
-            open_in_browser(current_item.url)
+            webbrowser.open(current_item.url)
 
         elif key == config['keys']['toggle_read'] and current_item:
             current_item.read = not current_item.read
@@ -325,39 +329,43 @@ def init_windows(screen, config):
 
 def parse_content(content, browser, width, images, log):
     if browser == 'lynx':
-        command = [
-            'lynx', '-stdin', '-dump', '-width', str(width), '-image_links'
-        ]
-        encoding = 'iso-8859-1'
+        output = subprocess.check_output(
+            ['lynx', '-stdin', '-dump', '-width', str(width), '-image_links'],
+            input=content.encode('iso-8859-1', 'xmlcharrefreplace'),
+            stderr=subprocess.STDOUT
+        )
+        output = output.decode(encoding, 'xmlcharrefreplace')
+
     elif browser == 'w3m':
-        command = ['w3m', '-T', 'text/html', '-dump', '-cols', str(width)]
-        encoding = 'utf-8'
+        output = subprocess.check_output(
+            ['w3m', '-T', 'text/html', '-dump', '-cols', str(width)],
+            input=content.encode('utf-8', 'xmlcharrefreplace'),
+            stderr=subprocess.STDOUT
+        )
+        output = output.decode(encoding, 'xmlcharrefreplace')
+
+    elif browser == 'html2text':
+        handler = HTML2Text()
+        handler.body_width = width
+        output = handler.handle(content)
+
     else:
         log('Unsuported browser: {}'.format(browser))
         return content
-
-    output = subprocess.check_output(
-        command,
-        input=content.encode(encoding, 'xmlcharrefreplace'),
-        stderr=subprocess.STDOUT
-    )
-    output = output.decode(encoding, 'xmlcharrefreplace')
 
     if images:
         if browser == 'lynx':
             # TODO
             pass
+
+        elif browser == 'html2text':
+            # TODO
+            pass
+
         else:
-            log('ASCII images are currently only supported with lynx.')
+            log('ASCII images are only supported with html2text or lynx.')
 
     return output
-
-
-def open_in_browser(url):
-    if sys.platform.startswith('linux'):
-        subprocess.Popen(['xdg-open', url])
-    elif sys.platform.startswith('darwin'):
-        subprocess.Popen(['open', url])
 
 
 def configure_keys(existing):

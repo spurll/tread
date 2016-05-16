@@ -29,6 +29,15 @@ Basic Usage
 Once installed, run `tread`. If your configuration file isn't located at
 `~/.tread.yml`, you may specify a file at runtime: `tread config.yml`.
 
+Supported HTML Parsers
+----------------------
+
+html2text
+
+On posix systems:
+lynx
+w3m (ascii images not supported)
+
 Updating Feeds
 --------------
 
@@ -50,7 +59,7 @@ Requirements
 * requests
 * beautifulsoup4
 * imgii
-* lynx, w3m, or html2text
+* html2text
 
 Bugs and Feature Requests
 =========================
@@ -58,7 +67,7 @@ Bugs and Feature Requests
 1.0 Checklist
 -------------
 
-* Image support (`lynx` only)
+* Image support (`lynx` only, or will `html2text` work?)
 * Python-only parser (`html2text`)
 * Offline process to update feeds (with `setup.py` endpoint!)
 * Readme update (fix all TODOs)
