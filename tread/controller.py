@@ -30,9 +30,41 @@ def console_main():
         'config', nargs='?', help='Path to the configuration file to use. '
         'Defaults to ~/.tread.yml.', default='~/.tread.yml'
     )
+    parser.add_argument(
+        '-u', '--update', help='Instead of running interactively, fetch '
+        'updates for all feeds then exit.', action='store_true'
+    )
     args = parser.parse_args()
 
-    curses.wrapper(partial(main, config_file=os.path.expanduser(args.config)))
+    if args.update:
+        update_feeds(os.path.expanduser(args.config))
+    else:
+        curses.wrapper(
+            partial(main, config_file=os.path.expanduser(args.config))
+        )
+
+
+def update_feeds(config_file):
+    # Load configuration.
+    with open(config_file) as f:
+        config = yaml.load(f)
+
+    # Set up database and requests sessions.
+    db_session, www_session = configure_sessions(config)
+
+    for feed in config.get('feeds', []):
+        # Load feeds from the database.
+        row = db_session.query(Feed).filter(Feed.url == feed['url']).scalar()
+
+        if row:
+            row.name = feed.get('name', row.name)
+        else:
+            row = Feed(feed.get('name', feed['url']), feed['url'])
+            db_session.add(row)
+            db_session.commit()
+
+        # Update feed items.
+        row.refresh(db_session, www_session, config.get('timeout'))
 
 
 def main(screen, config_file):
@@ -58,20 +90,8 @@ def main(screen, config_file):
     # Ensure config['keys'] exists and make all keys uppercase.
     config['keys'] = configure_keys(config.get('keys', dict()))
 
-    # Set up database and session.
-    db_path = os.path.expanduser(config.get('database', '~/.tread.db'))
-    db_uri = 'sqlite:///{}'.format(db_path)
-    engine = create_engine(db_uri)
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    db_session = Session()
-
-    # Set up requests to fetch data with retries.
-    www_session = requests.Session()
-    adapter = requests.adapters.HTTPAdapter(
-        max_retries=config.get('retries', 10)
-    )
-    www_session.mount('http://', adapter)
+    # Set up database and requests sessions.
+    db_session, www_session = configure_sessions(config)
 
     # This is the only time the whole screen is ever refreshed. But if you
     # don't refresh it, screen.getkey will clear it, because curses is awful.
@@ -331,6 +351,25 @@ def main(screen, config_file):
             break
 
 
+def configure_sessions(config):
+    # Set up database session.
+    db_path = os.path.expanduser(config.get('database', '~/.tread.db'))
+    db_uri = 'sqlite:///{}'.format(db_path)
+    engine = create_engine(db_uri)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    db_session = Session()
+
+    # Set up requests to fetch data with retries.
+    www_session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(
+        max_retries=config.get('retries', 10)
+    )
+    www_session.mount('http://', adapter)
+
+    return (db_session, www_session)
+
+
 def init_windows(screen, config):
     content = Window(
         screen, *content_dimensions(),
@@ -476,7 +515,7 @@ def resize(content, logo, sidebar, menu, messages):
 
 def sidebar_width():
     # Sidebar and menu width should half of screen up to a desired maximum.
-    return min(40, curses.COLS // 2)
+    return min(45, curses.COLS // 2)
 
 
 def logo_height():

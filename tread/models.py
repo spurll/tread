@@ -42,7 +42,7 @@ class Feed(Base):
         return len(list(filter(lambda item: item.starred, self.items)))
 
     # Update object from web and write back to DB.
-    def refresh(self, db_session, www_session, timeout, log):
+    def refresh(self, db_session, www_session, timeout, log=print):
         log('Refreshing {}...'.format(self.name))
         try:
             r = www_session.get(self.url, timeout=timeout)

@@ -47,6 +47,9 @@ feeds:
     url: http://xkcd.com/rss.xml
 ```
 
+Make sure that you get the spacing right (using spaces, not tabs); YAML can be a
+little finicky.
+
 ### Supported Parsers
 
 Several parsers are available to convert the HTML content found in RSS feeds to
@@ -68,10 +71,26 @@ Your feeds will be updated periodically while you use `tread`, but if you want
 to keep your feeds up-to-date even when the program isn't open you can use
 `cron` (or something similar) to schedule updates. This is helpful if you
 subscribe to a site that posts a lot of content (or has a short RSS history) and
-you don't check your feed reader very day.
+you don't check your feed reader every day.
 
-TODO: Add instructions for updating feeds
-TODO: Add endpoint for this
+To update your feeds in a non-interactive mode, simply pass the `--update` (or
+`-u`) flag:
+
+```bash
+$ tread --update
+```
+
+If you want your feeds to be updated daily at 09:00, add the following line to
+your `crontab` with `crontab -e`:
+
+```cron
+0 9 * * * tread --update
+```
+
+For Windows users, Windows Scheduler can be substituted for `cron`. On OS X,
+there are plenty of apps available for scheduling tasks; if you don't want to
+install a new application, you can use the builtin `launchd`, although it can
+be [a little more complicated](http://alvinalexander.com/mac-os-x/launchd-examples-launchd-plist-file-examples-mac).
 
 Requirements
 ------------
@@ -92,8 +111,6 @@ Bugs and Feature Requests
 -------------
 
 * Image support (`lynx` only, or will `html2text` work?)
-* Offline process to update feeds (with `setup.py` endpoint!)
-* Readme update (fix all TODOs)
 * Test installation procedures with blank config files
 
 Feature Requests
