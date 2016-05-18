@@ -12,6 +12,18 @@ Installation
 Install via pip with `pip3 install tread` or download the source and run
 `setup.py install`.
 
+Requirements
+------------
+
+* Python 3.5
+* sqlalchemy
+* pyyaml
+* python-dateutil
+* requests
+* beautifulsoup4
+* imgii
+* html2text
+
 Basic Usage
 -----------
 
@@ -62,7 +74,7 @@ Acceptable values for the `parser` field are: `html2text` (default), `lynx`, and
 If you're running `tread` in a Windows environment (or you'd prefer to avoid
 external calls), you probably want to use `html2text`, which will convert the
 content to markdown. On \*nix systems, `lynx` and `w3m` are also available (if
-you have them installed), although `w3m` doesn't support ASCII images.
+you have them installed).
 
 Updating Feeds
 --------------
@@ -92,26 +104,15 @@ there are plenty of apps available for scheduling tasks; if you don't want to
 install a new application, you can use the builtin `launchd`, although it can
 be [a little more complicated](http://alvinalexander.com/mac-os-x/launchd-examples-launchd-plist-file-examples-mac).
 
-Requirements
-------------
-
-* Python 3.5
-* sqlalchemy
-* pyyaml
-* python-dateutil
-* requests
-* beautifulsoup4
-* imgii
-* html2text
-
 Bugs and Feature Requests
 =========================
 
 1.0 Checklist
 -------------
 
-* Image support (`lynx` only, or will `html2text` work?)
+* Don't reparse on scrolling!
 * Test installation procedures with blank config files
+* Test on Windows
 
 Feature Requests
 ----------------

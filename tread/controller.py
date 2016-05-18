@@ -4,7 +4,8 @@
 # Attribution-ShareAlike 4.0 International License.                    
 
 
-import subprocess, requests, yaml, curses, textwrap, os, shutil, webbrowser
+import subprocess, requests, yaml, curses, textwrap, os, shutil, webbrowser, re
+import imgii
 from argparse import ArgumentParser
 from functools import partial
 from datetime import datetime, timedelta
@@ -12,7 +13,7 @@ from html2text import HTML2Text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, Window, Feed, Item
+from tread.models import Base, Window, Feed, Item
 
 
 LOGO = [
@@ -126,15 +127,6 @@ def main(screen, config_file):
             'has been provided.'.format(config_file)
         )
 
-    # TODO: Add ability to do 10j or 10<DOWN_ARROW>, like in vim. Clear it
-    # whenever a non-numeric key is hit.
-    # TODO: Add g/gg (or something) for top/bottom of feed items
-
-    # TODO: Warn that this will probably only work in lynx (or implement both...?)
-    # Insert output from image conversion on its own lines before the image tag
-    # (leave it)
-    # use image_to_ascii()
-
     # Load feeds from the DB.
     feeds = []
     for feed in config['feeds']:
@@ -162,6 +154,11 @@ def main(screen, config_file):
     autoscroll_to_item = False
     selected_feed = 0
     selected_item = 0
+
+    # TODO: Add ability to do 10j or 10<DOWN_ARROW>, like in vim. Clear it
+    # whenever a non-numeric key is hit.
+
+    # TODO: Add g/gg (or something) for top/bottom of feed items
 
     # TODO: Feed selection, item selection, etc. should probably be abstracted
     # into an object as well. These loops are really awkward, as is the line-
@@ -191,6 +188,9 @@ def main(screen, config_file):
 
         # Refresh sidebar.
         sidebar.refresh()
+
+        # TODO: IMPORTANT! Scrolling shouldn't necessitate a redraw! (It's very
+        # expensive, especially with images.) Maybe have a redraw flag?
 
         # Print content.
         if current_feed:
@@ -235,8 +235,7 @@ def main(screen, config_file):
                     if item_open:
                         # Parse the HTML content.
                         parsed_string = parse_content(
-                            item.content, config.get('parser', 'html2text'),
-                            content.width, config.get('ascii_images'), log
+                            item.content, config, content.width, log
                         )
 
                         # Print it to the screen.
@@ -393,7 +392,20 @@ def init_windows(screen, config):
     return (content, logo, sidebar, menu, messages)
 
 
-def parse_content(content, browser, width, images, log):
+def parse_content(content, config, width, log):
+    browser = config.get('parser', 'html2text')
+    images = config.get('ascii_images')
+    chars = imgii.BLOCKS if config.get('image_blocks') else imgii.CHARS
+
+    if images:
+        # Replace images with placeholder text, because (especially if using
+        # block characters) the images don't always survive parsing.
+        content = re.sub(
+            r'(<img\s.*src="(https?://\S+)"[^>]*>)',
+            r'<br/>TREAD_PLACEHOLDER \2 END_PLACEHOLDER<br/>\1',
+            content
+        )
+
     if browser == 'lynx':
         output = subprocess.check_output(
             [
@@ -424,16 +436,13 @@ def parse_content(content, browser, width, images, log):
         return content
 
     if images:
-        if browser == 'lynx':
-            # TODO
-            pass
-
-        elif browser == 'html2text':
-            # TODO
-            pass
-
-        else:
-            log('ASCII images are only supported with html2text or lynx.')
+        output = re.sub(
+            r'\n? *TREAD_PLACEHOLDER[\s\n]+(\S+)[\s\n]+END_PLACEHOLDER',
+            lambda m: '\n   ' + imgii.image_to_ascii(
+                m.group(1), url=True, console_width=width - 10, chars=chars
+            ).replace('\n', '\n   '),
+            output
+        )
 
     return output
 

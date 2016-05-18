@@ -7,7 +7,7 @@ from setuptools import setup
 setup(
     name='tread',
     packages=['tread'],
-    version='0.2',
+    version='0.3',
     description='A terminal feed reader.',
     url='https://github.com/spurll/tread',
     download_url='https://github.com/spurll/tread/tarball/0.1',
