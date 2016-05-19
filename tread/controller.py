@@ -1,19 +1,18 @@
-#!/usr/bin/env python3
-
-# Written by Gem Newman. This work is licensed under a Creative Commons         
-# Attribution-ShareAlike 4.0 International License.                    
-
-
-import subprocess, requests, yaml, curses, textwrap, os, shutil, webbrowser, re
+import os
+import subprocess
+import requests
+import yaml
+import curses
+import webbrowser
+import re
 import imgii
-from argparse import ArgumentParser
-from functools import partial
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from html2text import HTML2Text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from tread.models import Base, Window, Feed, Item
+from .models import Base, Window, Feed
+from .default_config import default_config
 
 
 LOGO = [
@@ -23,26 +22,6 @@ LOGO = [
     r"  | | ||  __/ (_| | (_| |            ",
     r"  |_|_| \___\\__'_|\__'_|  spurll.com"
 ]
-
-
-def console_main():
-    parser = ArgumentParser(description='A simple terminal feed reader.')
-    parser.add_argument(
-        'config', nargs='?', help='Path to the configuration file to use. '
-        'Defaults to ~/.tread.yml.', default='~/.tread.yml'
-    )
-    parser.add_argument(
-        '-u', '--update', help='Instead of running interactively, fetch '
-        'updates for all feeds then exit.', action='store_true'
-    )
-    args = parser.parse_args()
-
-    if args.update:
-        update_feeds(os.path.expanduser(args.config))
-    else:
-        curses.wrapper(
-            partial(main, config_file=os.path.expanduser(args.config))
-        )
 
 
 def update_feeds(config_file):
@@ -73,13 +52,9 @@ def main(screen, config_file):
     missing_config = not os.path.isfile(config_file)
 
     if missing_config:
-        sample_config = os.path.realpath(
-            os.path.join(os.path.dirname(__file__), '..', 'sample_config.yml')
-        )
-        missing_sample = not os.path.isfile(sample_config)
-
-        if not missing_sample:
-            shutil.copyfile(sample_config, config_file)
+        # Write default configuration to config file.
+        with open(config_file, 'w') as f:
+            f.write(default_config)
 
     # Load configuration.
     try:
@@ -119,11 +94,9 @@ def main(screen, config_file):
         )
         messages.refresh()
 
-    if missing_config and missing_sample:
-        log('No configuration file found at {}.'.format(config_file))
-    elif missing_config:
+    if missing_config:
         log(
-            'No configuration file found at {}. A sample configuration file '
+            'No configuration file found at {}. A default configuration file '
             'has been provided.'.format(config_file)
         )
 
@@ -152,6 +125,8 @@ def main(screen, config_file):
 
     item_open = False
     autoscroll_to_item = False
+    redraw_sidebar = True
+    redraw_content = True
     selected_feed = 0
     selected_item = 0
 
@@ -161,95 +136,90 @@ def main(screen, config_file):
     # TODO: Add g/gg (or something) for top/bottom of feed items
 
     # TODO: Feed selection, item selection, etc. should probably be abstracted
-    # into an object as well. These loops are really awkward, as is the line-
-    # counting.
+    # into an object as well. These loops are really awkward.
 
     while True:
-        current_item = None
-        current_feed = None
+        current_feed = feeds[selected_feed] if feeds else None
+        current_item = (
+            current_feed.items[selected_item] if current_feed else None
+        )
 
-        # Print sidebar.
-        for i, feed in enumerate(feeds):
-            # Add optional unread count to feed name display.
-            display_name = feed.name
-            if config.get('unread_count'):
-                display_name += ' ({}{})'.format(
-                    feed.unread,
-                    ', *{}'.format(feed.starred) if feed.starred else ''
-                )
-
-            sidebar.write(
-                '{:{}}'.format(display_name, sidebar.width), row_offset=i,
-                attr=curses.A_BOLD | curses.A_REVERSE * (i == selected_feed)
-            )
-
-            if i == selected_feed:
-                current_feed = feed
-
-        # Refresh sidebar.
-        sidebar.refresh()
-
-        # TODO: IMPORTANT! Scrolling shouldn't necessitate a redraw! (It's very
-        # expensive, especially with images.) Maybe have a redraw flag?
-
-        # Print content.
-        if current_feed:
-            for i, item in enumerate(current_feed.items):
-                attributes = (
-                    curses.A_REVERSE * (i == selected_item) |
-                    curses.A_BOLD * (not item.read)
-                )
-
-                if len(item.title) + 16 < content.width:
-                    # There is space for a date.
-                    content.write(
-                        '{:{}}{:%Y-%m-%d %H:%M}'.format(
-                            ('*' if item.starred else '') + item.title,
-                            content.width - 16, item.date
-                        ),
-                        row_offset=0 if i == 0 else None, attr=attributes
-                    )
-                else:
-                    # No space to include the date.
-                    content.write(
-                        '{:{}}'.format(
-                            ('*' if item.starred else '') + item.title,
-                            content.width
-                        ),
-                        row_offset=0 if i == 0 else None, attr=attributes
+        if redraw_sidebar:
+            redraw_sidebar = False
+            for i, feed in enumerate(feeds):
+                # Add optional unread count to feed name display.
+                display_name = feed.name
+                if config.get('unread_count'):
+                    display_name += ' ({}{})'.format(
+                        feed.unread,
+                        ', *{}'.format(feed.starred) if feed.starred else ''
                     )
 
-                if i == selected_item:
-                    current_item = item
+                sidebar.write(
+                    '{:{}}'.format(display_name, sidebar.width), row_offset=i,
+                    attr=curses.A_BOLD | curses.A_REVERSE * (i==selected_feed)
+                )
 
-                    # Autoscroll if newly-selected content is off the screen.
-                    if autoscroll_to_item:
-                        content.constrain_scroll(
-                            first_line=max(content.next_row-content.height, 0),
-                            last_line=content.height + content.next_row - 1
+            # Refresh sidebar.
+            sidebar.refresh()
+
+        if redraw_content:
+            redraw_content = False
+            if current_feed:
+                for i, item in enumerate(current_feed.items):
+                    attributes = (
+                        curses.A_REVERSE * (i == selected_item) |
+                        curses.A_BOLD * (not item.read)
+                    )
+
+                    if len(item.title) + 16 < content.width:
+                        # There is space for a date.
+                        content.write(
+                            '{:{}}{:%Y-%m-%d %H:%M}'.format(
+                                ('*' if item.starred else '') + item.title,
+                                content.width - 16, to_local(item.date)
+                            ),
+                            row_offset=0 if i == 0 else None, attr=attributes
                         )
-                        # Not perfect, because when the items are open
-                        # sometimes only the title will be visible. Oh well.
-                        autoscroll_to_item = False
-
-                    if item_open:
-                        # Parse the HTML content.
-                        parsed_string = parse_content(
-                            item.content, config, content.width, log
+                    else:
+                        # No space to include the date.
+                        content.write(
+                            '{:{}}'.format(
+                                ('*' if item.starred else '') + item.title,
+                                content.width
+                            ),
+                            row_offset=0 if i == 0 else None, attr=attributes
                         )
 
-                        # Print it to the screen.
-                        content.write('\n{}'.format(parsed_string))
+                    if i == selected_item:
+                        # Autoscroll if newly-selected content is offscreen.
+                        if autoscroll_to_item:
+                            content.constrain_scroll(
+                                first_line=max(
+                                    content.next_row - content.height, 0
+                                ),
+                                last_line=content.height + content.next_row - 1
+                            )
+                            # Not perfect, because sometimes when items are
+                            # open only the title will be visible. Oh well.
+                            autoscroll_to_item = False
 
-        else:
-            log(
-                'No feeds to display. Instructions for adding feeds are '
-                'available in the readme document.'
-            )
+                        if item_open:
+                            # Parse the HTML content.
+                            parsed_string = parse_content(
+                                item.content, config, content.width, log
+                            )
 
-        # Undo scrolling if content isn't big enough to scroll.
-        content.constrain_scroll(last_line=content.next_row)
-        content.refresh()
+                            # Print it to the screen.
+                            content.write('\n{}'.format(parsed_string))
+
+            else:
+                log(
+                    'No feeds to display. Instructions for adding feeds are '
+                    'available in the readme document.'
+                )
+
+            content.refresh()
 
         # Block, waiting for input.
         try:
@@ -263,9 +233,11 @@ def main(screen, config_file):
             draw_logo(logo)
             menu.write(menu_text(config['keys'], menu.width), row_offset=0)
             menu.refresh()
+            redraw_content = True
 
         elif key == config['keys']['open'] and current_item:
             content.clear() # Should be more selective.
+            redraw_content = True
             item_open = not item_open
 
             if item_open:
@@ -278,6 +250,7 @@ def main(screen, config_file):
         elif key == config['keys']['next_item'] and current_feed:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
+                redraw_content = True
                 selected_item = (selected_item + 1) % len(current_feed.items)
                 autoscroll_to_item = True
 
@@ -288,6 +261,7 @@ def main(screen, config_file):
         elif key == config['keys']['prev_item'] and current_feed:
             if len(current_feed.items) > 0:
                 content.clear() # Should be more selective.
+                redraw_content = True
                 selected_item = (selected_item - 1) % len(current_feed.items)
                 autoscroll_to_item = True
 
@@ -298,10 +272,13 @@ def main(screen, config_file):
         elif key == config['keys']['next_feed'] and current_feed:
             content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
+            redraw_content = True
+            redraw_sidebar = True
 
             selected_feed = (selected_feed + 1) % len(feeds)
             selected_item = 0
             item_open = False
+            autoscroll_to_item = True
 
             if (feeds[selected_feed].last_refresh is None) or (
                 datetime.utcnow() - feeds[selected_feed].last_refresh >
@@ -314,10 +291,13 @@ def main(screen, config_file):
         elif key == config['keys']['prev_feed'] and current_feed:
             content.clear() # Should be more selective.
             sidebar.clear() # Should be more selective.
+            redraw_content = True
+            redraw_sidebar = True
 
             selected_feed = (selected_feed - 1) % len(feeds)
             selected_item = 0
             item_open = False
+            autoscroll_to_item = True
 
             if (feeds[selected_feed].last_refresh is None) or (
                 datetime.utcnow() - feeds[selected_feed].last_refresh >
@@ -328,21 +308,25 @@ def main(screen, config_file):
                 )
 
         elif key == config['keys']['scroll_down']:
-            content.clear() # Should be more selective.
-            content.scroll_down()
+            content.scroll_down(config.get('scroll_lines', 5))
 
         elif key == config['keys']['scroll_up']:
-            content.clear() # Should be more selective.
-            content.scroll_up()
+            content.scroll_up(config.get('scroll_lines', 5))
 
         elif key == config['keys']['open_in_browser'] and current_item:
             webbrowser.open(current_item.url)
 
         elif key == config['keys']['toggle_read'] and current_item:
+            # Should be more selective.
+            redraw_content = True
+            redraw_sidebar = True
             current_item.read = not current_item.read
             db_session.commit()
 
         elif key == config['keys']['toggle_star'] and current_item:
+            # Should be more selective.
+            redraw_content = True
+            redraw_sidebar = True
             current_item.starred = not current_item.starred
             db_session.commit()
 
@@ -401,7 +385,7 @@ def parse_content(content, config, width, log):
         # Replace images with placeholder text, because (especially if using
         # block characters) the images don't always survive parsing.
         content = re.sub(
-            r'(<img\s.*src="(https?://\S+)"[^>]*>)',
+            r'(<img\s.*?src="(https?://.+?)"[^>]*?>)',
             r'<br/>TREAD_PLACEHOLDER \2 END_PLACEHOLDER<br/>\1',
             content
         )
@@ -437,11 +421,13 @@ def parse_content(content, config, width, log):
 
     if images:
         output = re.sub(
-            r'\n? *TREAD_PLACEHOLDER[\s\n]+(\S+)[\s\n]+END_PLACEHOLDER',
+            r'\n? *TREAD_PLACEHOLDER[\s\n]+?(.+?)[\s\n]+?END_PLACEHOLDER',
             lambda m: '\n   ' + imgii.image_to_ascii(
-                m.group(1), url=True, console_width=width - 10, chars=chars
+                re.sub(r'[\s\n]', '', m.group(1)),
+                url=True, console_width=width - 7, chars=chars
             ).replace('\n', '\n   '),
-            output
+            output,
+            flags=re.DOTALL
         )
 
     return output
@@ -581,5 +567,5 @@ def draw_logo(window):
     window.refresh()
 
 
-if __name__ == '__main__':
-    console_main()
+def to_local(dt):
+    return dt.replace(tzinfo=timezone.utc).astimezone(tz=None)

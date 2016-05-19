@@ -2,7 +2,6 @@ import curses
 from dateutil.parser import parse
 from datetime import datetime
 from bs4 import BeautifulSoup
-from imgii import image_to_ascii
 from sqlalchemy import Column, ForeignKey
 from sqlalchemy import Integer, Unicode, UnicodeText, DateTime, Boolean
 from sqlalchemy.orm import relationship
@@ -209,12 +208,14 @@ class Window:
         self.scroll(self.scroll_pos - n)
 
     def constrain_scroll(self, first_line=0, last_line=None):
+        if last_line is None:
+            last_line = self.next_row
+
         # Prevent negative scroll.
         self.scroll_pos = max(self.scroll_pos, first_line)
 
         # Prevent scrolling past the content.
-        if last_line is not None:
-            self.scroll_pos = min(self.scroll_pos, last_line - self.height)
+        self.scroll_pos = min(self.scroll_pos, last_line - self.height)
 
     def clear(self):
         self.pad.clear()

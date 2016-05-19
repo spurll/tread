@@ -1,3 +1,4 @@
+default_config = """
 feeds:
   - name: Bad Astronomy
     url: http://www.slate.com/blogs/bad_astronomy.fulltext.all.rss
@@ -26,6 +27,9 @@ parser: html2text
 retries: 10
 timeout: 10
 refresh: 10
+scroll_lines: 5
 ascii_images: true
+image_blocks: true
 buffer_lines: 1000
 unread_count: true
+"""

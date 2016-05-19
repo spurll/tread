@@ -36,9 +36,10 @@ By default, `tread` assumes that your configuration file is located at
 `~/.tread.yml`. If it isn't, you may specify a configuration file at runtime:
 `tread config.yml`.
 
-If the configuration file can't found at runtime, `tread` will copy
-`sample_config.yml` into the specified (or default) location. You may then edit
-this file to add feeds or change optional parameters.
+If the configuration file can't found at runtime, `tread` will create a
+configuration file for you with reasonable defaults and copy it to the specified
+(or default) location. You may then edit this file to add feeds or change
+optional parameters.
 
 ### Subscribing to a Feed
 
@@ -110,15 +111,16 @@ Bugs and Feature Requests
 1.0 Checklist
 -------------
 
-* Don't reparse on scrolling!
-* Test installation procedures with blank config files
 * Test on Windows
 
 Feature Requests
 ----------------
 
 * Support for ATOM feeds
-* View toggels to display only unread or only starred items
+* `default_config.py` should obviously be `default_config.yml`, but I'm tired
+  of wrestling with setuptools
+* View toggels to display only unread or only starred items (or the combination
+  of those two)
 * Ability to scroll feed list
 * Configurable DB pruning (only keep X days to prevent DB from ballooning)
 * Colour support
