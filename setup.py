@@ -8,6 +8,7 @@ setup(
     name='tread',
     packages=['tread'],
     scripts=['main.py'],
+    include_package_data=True,
     version='0.9',
     description='A terminal feed reader.',
     url='https://github.com/spurll/tread',
@@ -28,4 +29,5 @@ setup(
         'Topic :: Internet',
         'Programming Language :: Python :: 3.5'
     ],
+    zip_safe=False,
 )

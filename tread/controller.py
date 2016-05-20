@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import requests
 import yaml
@@ -52,9 +53,14 @@ def main(screen, config_file):
     missing_config = not os.path.isfile(config_file)
 
     if missing_config:
-        # Write default configuration to config file.
-        with open(config_file, 'w') as f:
-            f.write(default_config)
+        # Write default configuration to config file location.
+        sample_config = os.path.realpath(
+            os.path.join(os.path.dirname(__file__), 'default_config.yml')
+        )
+        missing_sample = not os.path.isfile(sample_config)
+
+        if not missing_sample:
+            shutil.copyfile(sample_config, config_file)
 
     # Load configuration.
     try:
@@ -94,7 +100,12 @@ def main(screen, config_file):
         )
         messages.refresh()
 
-    if missing_config:
+    if missing_config and missing_sample:
+        log(
+            'No configuration file found at {}. Please consult the readme '
+            'document.'.format(config_file)
+        )
+    elif missing_config:
         log(
             'No configuration file found at {}. A default configuration file '
             'has been provided.'.format(config_file)
