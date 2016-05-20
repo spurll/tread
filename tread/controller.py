@@ -13,7 +13,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base, Window, Feed
-from .default_config import default_config
 
 
 LOGO = [
@@ -247,7 +246,7 @@ def main(screen, config_file):
             redraw_content = True
 
         elif key == config['keys']['open'] and current_item:
-            content.clear() # Should be more selective.
+            content.clear()     # Should be more selective.
             redraw_content = True
             item_open = not item_open
 
@@ -260,7 +259,7 @@ def main(screen, config_file):
 
         elif key == config['keys']['next_item'] and current_feed:
             if len(current_feed.items) > 0:
-                content.clear() # Should be more selective.
+                content.clear()     # Should be more selective.
                 redraw_content = True
                 selected_item = (selected_item + 1) % len(current_feed.items)
                 autoscroll_to_item = True
@@ -271,7 +270,7 @@ def main(screen, config_file):
 
         elif key == config['keys']['prev_item'] and current_feed:
             if len(current_feed.items) > 0:
-                content.clear() # Should be more selective.
+                content.clear()     # Should be more selective.
                 redraw_content = True
                 selected_item = (selected_item - 1) % len(current_feed.items)
                 autoscroll_to_item = True
@@ -281,8 +280,8 @@ def main(screen, config_file):
                     db_session.commit()
 
         elif key == config['keys']['next_feed'] and current_feed:
-            content.clear() # Should be more selective.
-            sidebar.clear() # Should be more selective.
+            content.clear()     # Should be more selective.
+            sidebar.clear()     # Should be more selective.
             redraw_content = True
             redraw_sidebar = True
 
@@ -300,8 +299,8 @@ def main(screen, config_file):
                 )
 
         elif key == config['keys']['prev_feed'] and current_feed:
-            content.clear() # Should be more selective.
-            sidebar.clear() # Should be more selective.
+            content.clear()     # Should be more selective.
+            sidebar.clear()     # Should be more selective.
             redraw_content = True
             redraw_sidebar = True
 

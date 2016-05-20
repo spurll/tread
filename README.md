@@ -114,13 +114,6 @@ launchd-examples-launchd-plist-file-examples-mac).
 Bugs and Feature Requests
 =========================
 
-1.0 Checklist
--------------
-
-* `default_config.py` should obviously be `default_config.yml`, and be [included
-  as a data file](https://pythonhosted.org/setuptools/setuptools.html#including-
-  data-files), but I'm tired of wrestling with setuptools
-
 Feature Requests
 ----------------
 
