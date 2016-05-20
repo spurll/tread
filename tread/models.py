@@ -75,7 +75,7 @@ class Feed(Base):
 
             if row:
                 # Update the item.
-                row.title = item.title.string
+                row.title = item.title.string if item.title.string else ''
                 row.url = item.link.string
                 row.date = parse(item.pubdate.string)
                 row.content = (
@@ -86,7 +86,7 @@ class Feed(Base):
                 # Create the item.
                 row = Item(
                     guid=guid,
-                    title=item.title.string,
+                    title=item.title.string if item.title.string else '',
                     url=item.link.string,
                     date=parse(item.pubdate.string),
                     content=(

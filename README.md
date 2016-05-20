@@ -116,6 +116,7 @@ Feature Requests
 ----------------
 
 * Support for ATOM feeds
+* Key to manually refresh a feed
 * View toggels to display only unread or only starred items (or the combination
   of those two)
 * Ability to scroll feed list

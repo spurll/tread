@@ -244,6 +244,7 @@ def main(screen, config_file):
             menu.write(menu_text(config['keys'], menu.width), row_offset=0)
             menu.refresh()
             redraw_content = True
+            redraw_sidebar = True
 
         elif key == config['keys']['open'] and current_item:
             content.clear()     # Should be more selective.
