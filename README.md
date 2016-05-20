@@ -10,19 +10,26 @@ Installation
 ------------
 
 Install via pip with `pip3 install tread` or download the source and run
-`setup.py install`.
+`python3 setup.py install`.
 
 Requirements
 ------------
 
 * Python 3.5
-* sqlalchemy
-* pyyaml
-* python-dateutil
-* requests
-* beautifulsoup4
-* imgii
-* html2text
+* `curses` (included with Python 3.5 on \*nix systems)
+* `sqlalchemy`
+* `pyyaml`
+* `python-dateutil`
+* `requests`
+* `beautifulsoup4`
+* `imgii`
+* `html2text`
+
+Because `curses` is not included on Windows distributions of Python, Windows
+users may want to run `tread` in Cygwin (or maybe [bash for Windows](http://
+www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-
+10/) would work). Alternatively, you can make a go of it with one of the
+several `curses` implementations available for Windows.
 
 Basic Usage
 -----------
@@ -72,10 +79,9 @@ configuration file's `parser` field.
 Acceptable values for the `parser` field are: `html2text` (default), `lynx`, and
 `w3m`.
 
-If you're running `tread` in a Windows environment (or you'd prefer to avoid
-external calls), you probably want to use `html2text`, which will convert the
-content to markdown. On \*nix systems, `lynx` and `w3m` are also available (if
-you have them installed).
+If you'd prefer to avoid external calls, you probably want to use `html2text`,
+which will convert the content to markdown; the `lynx` and `w3m` browsers can
+also be used to parse the content (if you have them installed).
 
 Updating Feeds
 --------------
@@ -100,10 +106,10 @@ your `crontab` with `crontab -e`:
 0 9 * * * tread --update
 ```
 
-For Windows users, Windows Scheduler can be substituted for `cron`. On OS X,
-there are plenty of apps available for scheduling tasks; if you don't want to
-install a new application, you can use the builtin `launchd`, although it can
-be [a little more complicated](http://alvinalexander.com/mac-os-x/launchd-examples-launchd-plist-file-examples-mac).
+On OS X, there are plenty of apps available for scheduling tasks; if you don't
+want to install a new application, you can use the builtin `launchd`, although
+it can be [a little more complicated](http://alvinalexander.com/mac-os-x/
+launchd-examples-launchd-plist-file-examples-mac).
 
 Bugs and Feature Requests
 =========================
@@ -111,21 +117,19 @@ Bugs and Feature Requests
 1.0 Checklist
 -------------
 
-* Test on Windows
+* `default_config.py` should obviously be `default_config.yml`, and be [included
+  as a data file](https://pythonhosted.org/setuptools/setuptools.html#including-
+  data-files), but I'm tired of wrestling with setuptools
 
 Feature Requests
 ----------------
 
 * Support for ATOM feeds
-* `default_config.py` should obviously be `default_config.yml`, but I'm tired
-  of wrestling with setuptools
 * View toggels to display only unread or only starred items (or the combination
   of those two)
 * Ability to scroll feed list
 * Configurable DB pruning (only keep X days to prevent DB from ballooning)
 * Colour support
-* Ability to (and instructions for) running a cron job to check feeds and
-  update the DB regularly even if the main feed reader isn't invoked
 * [bcj](https://github.com/bcj) recommends changing the name to `cuRSSes`
 
 Known Bugs
