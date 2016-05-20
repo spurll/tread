@@ -26,9 +26,8 @@ Requirements
 * `html2text`
 
 Because `curses` is not included on Windows distributions of Python, Windows
-users may want to run `tread` in Cygwin (or maybe [bash for Windows](http://
-www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-
-10/) would work). Alternatively, you can make a go of it with one of the
+users may want to run `tread` in Cygwin (or maybe [bash for Windows](http://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/)
+would work). Alternatively, you can make a go of it with one of the
 several `curses` implementations available for Windows.
 
 Basic Usage
@@ -108,18 +107,10 @@ your `crontab` with `crontab -e`:
 
 On OS X, there are plenty of apps available for scheduling tasks; if you don't
 want to install a new application, you can use the builtin `launchd`, although
-it can be [a little more complicated](http://alvinalexander.com/mac-os-x/
-launchd-examples-launchd-plist-file-examples-mac).
+it can be [a little more complicated](http://alvinalexander.com/mac-os-x/launchd-examples-launchd-plist-file-examples-mac).
 
 Bugs and Feature Requests
 =========================
-
-1.0 Checklist
--------------
-
-* `default_config.py` should obviously be `default_config.yml`, and be [included
-  as a data file](https://pythonhosted.org/setuptools/setuptools.html#including-
-  data-files), but I'm tired of wrestling with setuptools
 
 Feature Requests
 ----------------
