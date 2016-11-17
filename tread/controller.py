@@ -268,6 +268,7 @@ def main(screen, config_file):
                 if item_open:
                     current_feed.items[selected_item].read = True
                     db_session.commit()
+                    redraw_sidebar = True
 
         elif key == config['keys']['prev_item'] and current_feed:
             if len(current_feed.items) > 0:
@@ -279,6 +280,7 @@ def main(screen, config_file):
                 if item_open:
                     current_feed.items[selected_item].read = True
                     db_session.commit()
+                    redraw_sidebar = True
 
         elif key == config['keys']['next_feed'] and current_feed:
             content.clear()     # Should be more selective.
@@ -391,6 +393,8 @@ def parse_content(content, config, width, log):
     browser = config.get('parser', 'html2text')
     images = config.get('ascii_images')
     chars = imgii.BLOCKS if config.get('image_blocks') else imgii.CHARS
+
+    # TODO: Cache all ASCII images in a dict by URL.
 
     if images:
         # Replace images with placeholder text, because (especially if using
