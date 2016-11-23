@@ -85,11 +85,14 @@ also be used to parse the content (if you have them installed).
 Updating Feeds
 --------------
 
-Your feeds will be updated periodically while you use `tread`, but if you want
-to keep your feeds up-to-date even when the program isn't open you can use
-`cron` (or something similar) to schedule updates. This is helpful if you
-subscribe to a site that posts a lot of content (or has a short RSS history) and
-you don't check your feed reader every day.
+Your feeds will be updated periodically while you use `tread`, and you can
+manually update a feed by hitting the key dfined in your configuration YAML file
+(which defaults to `U`).
+
+If you want to keep your feeds up-to-date even when the program isn't open you
+can use `cron` (or something similar) to schedule updates. This is helpful if
+you subscribe to a site that posts a lot of content (or has a short RSS history)
+and you don't check your feed reader every day.
 
 To update your feeds in a non-interactive mode, simply pass the `--update` (or
 `-u`) flag:
@@ -116,12 +119,11 @@ Feature Requests
 ----------------
 
 * Support for ATOM feeds
-* Key to manually refresh a feed
-* View toggels to display only unread or only starred items (or the combination
+* View toggles to display only unread or only starred items (or the combination
   of those two)
 * Ability to scroll feed list
 * Configurable DB pruning (only keep X days to prevent DB from ballooning)
-* Colour support
+* Colour support for images
 * [bcj](https://github.com/bcj) recommends changing the name to `cuRSSes`
 
 Known Bugs

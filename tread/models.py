@@ -2,6 +2,7 @@ import curses
 from dateutil.parser import parse
 from datetime import datetime
 from bs4 import BeautifulSoup
+from html import unescape
 from sqlalchemy import Column, ForeignKey
 from sqlalchemy import Integer, Unicode, UnicodeText, DateTime, Boolean
 from sqlalchemy.orm import relationship
@@ -69,29 +70,35 @@ class Feed(Base):
         self.description = soup.channel.description.string
 
         for item in soup.find_all('item'):
-            guid = item.guid.string
+            guid = item.guid.string if item.guid else item.link.string
             row = db_session.query(Item).filter(Item.feed_id == self.id) \
                 .filter(Item.guid == guid).scalar()
 
             if row:
                 # Update the item.
-                row.title = item.title.string if item.title.string else ''
+                row.title = unescape(
+                    item.title.string if item.title.string else ''
+                )
                 row.url = item.link.string
                 row.date = parse(item.pubdate.string)
-                row.content = (
-                    item.find('content:encoded') or item.description
-                ).string
+                row.content = unescape(
+                    (item.find('content:encoded') or item.description).string
+                )
 
             else:
                 # Create the item.
                 row = Item(
                     guid=guid,
-                    title=item.title.string if item.title.string else '',
+                    title=unescape(
+                        item.title.string if item.title.string else ''
+                    ),
                     url=item.link.string,
                     date=parse(item.pubdate.string),
-                    content=(
-                        item.find('content:encoded') or item.description
-                    ).string
+                    content=unescape(
+                        (
+                            item.find('content:encoded') or item.description
+                        ).string
+                    )
                 )
                 self.items.append(row)
 

@@ -1,3 +1,4 @@
-v0.9, 2016-05-19 -- Initial release.
-v0.9.1, 2016-05-20 -- Fixed attempted import of a nonexistent module.
-v0.9.2, 2016-05-20 -- Fixed crash with feed items that have no title.
+v0.9, 2016-05-19 -- Initial release
+v0.9.1, 2016-05-20 -- Fix attempted import of a nonexistent module
+v0.9.2, 2016-05-20 -- Fix crash with feed items that have no title
+v0.9.3, 2016-11-23 -- Fix crash with feed items that have no GUID; add manual feed refresh; improve HTML entity parsing

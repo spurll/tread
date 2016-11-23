@@ -5,6 +5,8 @@ feeds:
     url: http://boingboing.net/feed
   - name: Whatever
     url: http://whatever.scalzi.com/feed
+  - name: Winnipeg Skeptics
+    url: http://winnipegskeptics.com/feed/
   - name: xkcd
     url: http://xkcd.com/rss.xml
 
@@ -14,6 +16,7 @@ keys:
   next_item: J
   prev_feed: H
   next_feed: L
+  update_feed: U
   scroll_up: KEY_UP
   scroll_down: KEY_DOWN
   toggle_read: R
@@ -25,7 +28,7 @@ database: ~/.tread.db
 parser: html2text
 retries: 10
 timeout: 10
-refresh: 10
+refresh: 1440
 scroll_lines: 5
 ascii_images: true
 image_blocks: true

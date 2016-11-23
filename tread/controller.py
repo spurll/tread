@@ -326,6 +326,20 @@ def main(screen, config_file):
         elif key == config['keys']['scroll_up']:
             content.scroll_up(config.get('scroll_lines', 5))
 
+        elif key == config['keys']['update_feed'] and current_feed:
+            content.clear()     # Should be more selective.
+            sidebar.clear()     # Should be more selective.
+            redraw_content = True
+            redraw_sidebar = True
+
+            selected_item = 0
+            item_open = False
+            autoscroll_to_item = True
+
+            feeds[selected_feed].refresh(
+                db_session, www_session, config.get('timeout'), log
+            )
+
         elif key == config['keys']['open_in_browser'] and current_item:
             webbrowser.open(current_item.url)
 
@@ -455,6 +469,7 @@ def configure_keys(existing):
         'next_item': 'J',
         'prev_feed': 'H',
         'next_feed': 'L',
+        'update_feed': 'U',
         'scroll_up': 'KEY_UP',
         'scroll_down': 'KEY_DOWN',
         'toggle_read': 'R',
@@ -498,6 +513,9 @@ def menu_text(keys, width):
             disp['scroll_up'] + '/' + disp['scroll_down'], value_width
         ),
         menu_format.format(
+            'Update Feed:', key_width, disp['update_feed'], value_width
+        ),
+        menu_format.format(
             'Toggle Read:', key_width, disp['toggle_read'], value_width
         ),
         menu_format.format(
@@ -535,7 +553,7 @@ def logo_height():
 
 def menu_height():
     # Menu height should be a quarter of screen up to the number of menu items.
-    return min(8 + 2 * Window.border_height, curses.LINES // 4)
+    return min(9 + 2 * Window.border_height, curses.LINES // 4)
 
 
 def message_height():
