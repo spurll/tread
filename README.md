@@ -3,6 +3,8 @@ tread
 
 A basic terminal RSS feed reader written in Python 3.
 
+![Screenshot](/screenshots/tread.png?raw=true)
+
 Usage
 =====
 
