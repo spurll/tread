@@ -125,6 +125,7 @@ Feature Requests
 ----------------
 
 * Support for ATOM feeds
+* Allow feed URLs to be updated (e.g., maybe with "previous\_url" in YAML?)
 * View toggles to display only unread or only starred items (or the combination
   of those two)
 * Ability to scroll feed list
