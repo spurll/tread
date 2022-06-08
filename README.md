@@ -59,13 +59,17 @@ file to specify the feeds to which they want to subscribe. For each feed,
 ```yaml
 feeds:
   - name: Bad Astronomy
-    url: http://www.slate.com/blogs/bad_astronomy.fulltext.all.rss
-  - name: Boing Boing
-    url: http://boingboing.net/feed
+    url: https://www.syfy.com/syfy-wire/topic/bad-astronomy/feed
   - name: Whatever
-    url: http://whatever.scalzi.com/feed
+    url: https://whatever.scalzi.com/feed
+  - name: Waypoint
+    url: https://waypoint.vice.com/en_us/rss
+  - name: Motherboard
+    url: https://motherboard.vice.com/en_us/rss
+  - name: Pluralistic.net
+    url: https://pluralistic.net/feed/
   - name: xkcd
-    url: http://xkcd.com/rss.xml
+    url: https://xkcd.com/rss.xml
 ```
 
 Make sure that you get the spacing right (using spaces, not tabs); YAML can be a

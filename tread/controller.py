@@ -62,10 +62,12 @@ def main(screen, config_file):
             shutil.copyfile(sample_config, config_file)
 
     # Load configuration.
+    config_load_error = None
     try:
         with open(config_file) as f:
-            config = yaml.load(f)
-    except:
+            config = yaml.safe_load(f)
+    except Exception as e:
+        config_load_error = f'Error loading configuration: {e}'
         config = {'feeds': []}
 
     # Ensure config['keys'] exists and make all keys uppercase.
@@ -109,6 +111,9 @@ def main(screen, config_file):
             'No configuration file found at {}. A default configuration file '
             'has been provided.'.format(config_file)
         )
+
+    if config_load_error:
+        log(config_load_error)
 
     # Load feeds from the DB.
     feeds = []
