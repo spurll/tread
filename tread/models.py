@@ -59,7 +59,7 @@ class Feed(Base):
             return
 
         xml = r.text
-        soup = BeautifulSoup(xml, 'html.parser')
+        soup = BeautifulSoup(xml, 'xml')
 
         # TODO: Add support for ATOM feeds as well.
 
@@ -80,7 +80,7 @@ class Feed(Base):
                     item.title.string if item.title.string else ''
                 )
                 row.url = item.link.string
-                row.date = parse(item.pubdate.string)
+                row.date = parse(item.pubDate.string)
                 row.content = unescape(
                     (item.find('content:encoded') or item.description).string
                 )
@@ -93,7 +93,7 @@ class Feed(Base):
                         item.title.string if item.title.string else ''
                     ),
                     url=item.link.string,
-                    date=parse(item.pubdate.string),
+                    date=parse(item.pubDate.string),
                     content=unescape(
                         (
                             item.find('content:encoded') or item.description

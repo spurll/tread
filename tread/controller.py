@@ -96,20 +96,19 @@ def main(screen, config_file):
     # Add loading message.
     def log(message):
         messages.write(
-            '{:%Y-%m-%d %H:%M}: {}'.format(datetime.now(), message),
-            autoscroll=True
+            f'{datetime.now():%Y-%m-%d %H:%M}: {message}', autoscroll=True
         )
         messages.refresh()
 
     if missing_config and missing_sample:
         log(
-            'No configuration file found at {}. Please consult the readme '
-            'document.'.format(config_file)
+            f'No configuration file found at {config_file}. Please consult the'
+            ' readme document.'
         )
     elif missing_config:
         log(
-            'No configuration file found at {}. A default configuration file '
-            'has been provided.'.format(config_file)
+            f'No configuration file found at {config_file}. A default '
+            'configuration file has been provided.'
         )
 
     if config_load_error:
@@ -226,7 +225,7 @@ def main(screen, config_file):
                             )
 
                             # Print it to the screen.
-                            content.write('\n{}'.format(parsed_string))
+                            content.write(f'\n{parsed_string}')
 
             else:
                 log(
@@ -346,7 +345,10 @@ def main(screen, config_file):
             )
 
         elif key == config['keys']['open_in_browser'] and current_item:
-            webbrowser.open(current_item.url)
+            if current_item.url:
+                webbrowser.open(current_item.url)
+            else:
+                log(f'No URL associated with {current_item.title}')
 
         elif key == config['keys']['toggle_read'] and current_item:
             # Should be more selective.
@@ -369,7 +371,7 @@ def main(screen, config_file):
 def configure_sessions(config):
     # Set up database session.
     db_path = os.path.expanduser(config.get('database', '~/.tread.db'))
-    db_uri = 'sqlite:///{}'.format(db_path)
+    db_uri = f'sqlite:///{db_path}'
     engine = create_engine(db_uri)
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
@@ -380,7 +382,7 @@ def configure_sessions(config):
     adapter = requests.adapters.HTTPAdapter(
         max_retries=config.get('retries', 10)
     )
-    www_session.mount('http://', adapter)
+    www_session.mount('https://', adapter)
 
     return (db_session, www_session)
 
@@ -450,7 +452,7 @@ def parse_content(content, config, width, log):
         output = handler.handle(content)
 
     else:
-        log('Unsuported browser: {}'.format(browser))
+        log(f'Unsuported browser: {browser}')
         return content
 
     if images:

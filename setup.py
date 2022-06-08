@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 
-
 from setuptools import setup
-
 
 setup(
     name='tread',
     packages=['tread'],
     scripts=['main.py'],
     include_package_data=True,
-    version='0.9.4',
+    version='0.9.5',
     description='A terminal feed reader.',
     url='https://github.com/spurll/tread',
-    download_url='https://github.com/spurll/tread/tarball/0.9.4',
+    download_url='https://github.com/spurll/tread/tarball/0.9.5',
     author='Gem Newman',
     author_email='spurll@gmail.com',
     license='CC BY-SA 4.0',
