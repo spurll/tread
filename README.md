@@ -139,8 +139,6 @@ Known Bugs
 * When an image is displayed in a feed item and a series resizes occur, way too
   many external requests get generated, and hosts will frequently stop
   responding (and it's slow); solve by caching all ASCII images in a dict by URL
-* Looks like some Unicode characters aren't working right, such as the title
-  text in this xkcd comic: http://xkcd.com/1647/
 * Resizing the screen results in losing the contents of the messages window (oh
   well)
 * Currently ignores the `<sy:updatePeriod>`, `<sy:updateFrequency>`, and

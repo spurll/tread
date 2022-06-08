@@ -7,7 +7,7 @@ setup(
     packages=['tread'],
     scripts=['main.py'],
     include_package_data=True,
-    version='0.9.5',
+    version='0.9.6',
     description='A terminal feed reader.',
     url='https://github.com/spurll/tread',
     download_url='https://github.com/spurll/tread/tarball/0.9.5',
@@ -21,7 +21,8 @@ setup(
         'imgii >= 0.3.1',
         'python-dateutil >= 2.8',
         'sqlalchemy >= 1.4',
-        'html2text >= 2020'
+        'html2text >= 2020',
+        'wcwidth >= 0.2.5'
     ],
     entry_points={'console_scripts': ('tread = main:console_main')},
     keywords=['rss', 'feed', 'reader'],

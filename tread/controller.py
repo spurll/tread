@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from html2text import HTML2Text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from wcwidth import wcswidth
 
 from .models import Base, Window, Feed
 
@@ -186,24 +187,23 @@ def main(screen, config_file):
                         curses.A_BOLD * (not item.read)
                     )
 
-                    if len(item.title) + 16 < content.width:
-                        # There is space for a date.
-                        content.write(
-                            '{:{}}{:%Y-%m-%d %H:%M}'.format(
-                                ('*' if item.starred else '') + item.title,
-                                content.width - 16, to_local(item.date)
-                            ),
-                            row_offset=0 if i == 0 else None, attr=attributes
-                        )
-                    else:
-                        # No space to include the date.
-                        content.write(
-                            '{:{}}'.format(
-                                ('*' if item.starred else '') + item.title,
-                                content.width
-                            ),
-                            row_offset=0 if i == 0 else None, attr=attributes
-                        )
+                    # Use manual padding calcuations because Python's built-in
+                    # string formatting doesn't play nicely with double-width
+                    # Unicode characters
+                    disp_title = ("* " if item.starred else "") + item.title
+                    width = wcswidth(disp_title)
+
+                    # Is there space to display the pubdate?
+                    show_date = width + 16 < content.width
+                    padding = content.width - width - 16 * show_date
+                    content.write(
+                        f'{disp_title}{padding * " "}' + (
+                            f'{to_local(item.date):%Y-%m-%d %H:%M}'
+                            if show_date else ''
+                        ),
+                        row_offset=0 if i == 0 else None,
+                        attr=attributes
+                    )
 
                     if i == selected_item:
                         # Autoscroll if newly-selected content is offscreen.
